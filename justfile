@@ -1,9 +1,10 @@
 
-# Android GKI 5.15 内核构建脚本，支持 KernelSU
-# 支持通过 env 文件配置参数，支持安卓13/14/15/16 多版本编译
+# 安卓GKI内核构建脚本，支持 KernelSU
 
-# 优先加载指定 env 文件，未指定则默认加载 .env.android13
-ENV_FILE := ".env.android13"
+# 支持通过 env 文件配置参数，支持安卓13/14/15 多版本编译
+# 如果编译安卓14内核，先执行 cp env.android14 .env
+set dotenv-load
+
 export ANDROID_VERSION := env_var_or_default("ANDROID_VERSION", "android13")
 export KERNEL_VERSION := env_var_or_default("KERNEL_VERSION", "5.15")
 export SUB_LEVEL := env_var_or_default("SUB_LEVEL", "167")
@@ -98,7 +99,7 @@ download-gki: download-deps
         echo "GKI kernel source already downloaded, skipping."
         exit 0
     fi
-    echo "Downloading GKI kernel source..."
+    echo "Downloading {{CONFIG}} GKI kernel source..."
     # 创建配置目录
     mkdir -p {{CONFIG}}
     cd {{CONFIG}}

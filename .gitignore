@@ -22,3 +22,4 @@ AnyKernel3
 susfs4ksu
 kernel_patches
 bootimgs/
+.env
