@@ -11,6 +11,13 @@ git-repo
 Image*
 *.ko
 *.o
+*.o.d
+*.cmd
+System.map
+Module.symvers
+modules.order
+vmlinux
+vmlinux.*
 *.mod
 *.mod.c
 *.mod.o
