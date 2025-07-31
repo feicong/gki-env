@@ -1,6 +1,6 @@
-# Android 13 GKI 5.15 Kernel Build Script with KernelSU Support
+# Android 13 GKI 5.15 内核构建脚本，支持 KernelSU
 
-# Default configuration
+# 默认配置
 ANDROID_VERSION := "android13"
 KERNEL_VERSION := "5.15"
 SUB_LEVEL := "167"
@@ -9,13 +9,13 @@ KERNELSU_VARIANT := "KSU"  # Options: KSU, KSU_NEXT, MKSU
 KERNELSU_BRANCH := "Stable"  # Options: Stable, Dev, Other
 INCLUDE_SUSFS := "true"
 
-# Directories
+# 目录设置
 WORKSPACE := justfile_directory()
 CONFIG := ANDROID_VERSION + "-" + KERNEL_VERSION + "-" + SUB_LEVEL
 TOOLCHAIN_DIR := WORKSPACE + "/kernel-build-tools"
 MKBOOTIMG_DIR := WORKSPACE + "/mkbootimg"
 
-# Environment variables
+# 环境变量
 export https_proxy := env_var_or_default("https_proxy", "")
 export HTTP_PROXY := env_var_or_default("HTTP_PROXY", "")
 export CCACHE_COMPILERCHECK := "%compiler% -dumpmachine; %compiler% -dumpversion"
@@ -26,25 +26,25 @@ export CCACHE_DIR := env_var_or_default("HOME", "") + "/.ccache"
 default:
     @just --list
 
-# Install dependencies and setup environment
+# 安装依赖并设置构建环境
 setup:
     #!/bin/bash
     echo "Setting up build environment..."
     
-    # Install system dependencies
+    # 安装系统依赖
     sudo apt update
     sudo apt install -y ccache curl git python3 python3-pip build-essential bc bison flex libssl-dev libelf-dev
     
-    # Setup ccache
+    # 配置 ccache
     mkdir -p ~/.cache/bazel
     ccache --version
     ccache --max-size=2G
     ccache --set-config=compression=true
     
-    # Download toolchain if not exists
+    # 如未下载则下载工具链
     just download-toolchain
     
-    # Install repo tool
+    # 安装 repo 工具
     mkdir -p {{WORKSPACE}}/git-repo
     if [ ! -f {{WORKSPACE}}/git-repo/repo ]; then
         echo "Downloading repo tool..."
@@ -54,7 +54,7 @@ setup:
     
     echo "Setup completed!"
 
-# Download toolchain
+# 下载工具链
 download-toolchain:
     #!/bin/bash
     if [ -d "{{TOOLCHAIN_DIR}}" ] && [ -d "{{MKBOOTIMG_DIR}}" ]; then
@@ -67,7 +67,7 @@ download-toolchain:
     git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 {{TOOLCHAIN_DIR}}
     git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 {{MKBOOTIMG_DIR}}
 
-# Download dependencies (AnyKernel3, SUSFS, kernel patches)
+# 下载依赖（AnyKernel3、SUSFS、内核补丁）
 download-deps:
     #!/bin/bash
     if [ -d "AnyKernel3" ] && [ -d "susfs4ksu" ] && [ -d "kernel_patches" ]; then
@@ -75,20 +75,20 @@ download-deps:
         exit 0
     fi
     echo "Downloading dependencies..."
-    # Clone AnyKernel3
+    # 克隆 AnyKernel3
     if [ ! -d "AnyKernel3" ]; then
         git clone https://github.com/ukriu/AnyKernel3.git -b gki --depth 1
     fi
-    # Clone SUSFS
+    # 克隆 SUSFS
     if [ ! -d "susfs4ksu" ]; then
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}} --depth 1
     fi
-    # Clone kernel patches
+    # 克隆内核补丁
     if [ ! -d "kernel_patches" ]; then
         git clone https://github.com/ukriu/kernel_patches.git --depth 1
     fi
 
-# Download GKI kernel source
+# 下载 GKI 内核源码
 download-gki: download-deps
     #!/bin/bash
     if [ -d "{{CONFIG}}/.repo" ]; then
@@ -96,28 +96,28 @@ download-gki: download-deps
         exit 0
     fi
     echo "Downloading GKI kernel source..."
-    # Create config directory
+    # 创建配置目录
     mkdir -p {{CONFIG}}
     cd {{CONFIG}}
-    # Initialize repo
+    # 初始化 repo
     FORMATTED_BRANCH="{{ANDROID_VERSION}}-{{KERNEL_VERSION}}-{{OS_PATCH_LEVEL}}"
     {{WORKSPACE}}/git-repo/repo init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
-    # Check if branch is deprecated and update manifest
+    # 检查分支是否已废弃并更新 manifest
     REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
     if echo "$REMOTE_BRANCH" | grep -q deprecated; then
         echo "Found deprecated branch: $FORMATTED_BRANCH"
         sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" .repo/manifests/default.xml
     fi
-    # Sync repo
+    # 同步 repo
     {{WORKSPACE}}/git-repo/repo sync -c -j$(nproc --all) --no-tags --fail-fast
 
-# Apply KernelSU patches
+# 应用 KernelSU 补丁
 apply-kernelsu:
     #!/bin/bash
     echo "Applying KernelSU patches..."
     cd {{CONFIG}}
     
-    # Determine branch
+    # 判断分支
     if [[ "{{KERNELSU_BRANCH}}" == "Stable" ]]; then
         BRANCH=""
     elif [[ "{{KERNELSU_BRANCH}}" == "Dev" && ( "{{KERNELSU_VARIANT}}" == "KSU" || "{{KERNELSU_VARIANT}}" == "MKSU" ) ]]; then
@@ -126,7 +126,7 @@ apply-kernelsu:
         BRANCH="-s next"
     fi
     
-    # Apply KernelSU
+    # 应用 KernelSU
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         echo "Adding KernelSU Official..."
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
@@ -138,7 +138,7 @@ apply-kernelsu:
         curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
     fi
 
-# Apply SUSFS patches
+# 应用 SUSFS 补丁
 apply-susfs:
     #!/bin/bash
     if [[ "{{INCLUDE_SUSFS}}" != "true" ]]; then
@@ -149,12 +149,12 @@ apply-susfs:
     echo "Applying SUSFS patches..."
     cd {{CONFIG}}
     
-    # Copy SUSFS patches
+    # 拷贝 SUSFS 补丁
     cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch ./common/
     cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
     cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
     
-    # Apply variant-specific patches
+    # 应用不同变体的补丁
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         echo "Applying SUSFS patches for Official KernelSU..."
         cd ./KernelSU
@@ -175,13 +175,13 @@ apply-susfs:
     cd ../common
     patch -p1 --fuzz=3 < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch || true
 
-# Apply additional patches
+# 应用其他补丁
 apply-patches:
     #!/bin/bash
     echo "Applying additional patches..."
     cd {{CONFIG}}
     
-    # Apply All Managers patch for KSU
+    # KSU 变体应用 All Managers 补丁
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         cd KernelSU
         if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
@@ -194,7 +194,7 @@ apply-patches:
         cd ..
     fi
     
-    # Apply hooks patches
+    # 应用 hooks 补丁
     cd common
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "Applying hooks for KernelSU-Next..."
@@ -202,24 +202,24 @@ apply-patches:
         patch -p1 -F 3 < syscall_hooks.patch
     fi
     
-    # Apply hide stuff patches
+    # 应用隐藏补丁
     cp ../../kernel_patches/69_hide_stuff.patch ./
     patch -p1 -F 3 < 69_hide_stuff.patch
 
-# Configure kernel
+# 配置内核
 configure:
     #!/bin/bash
     echo "Configuring kernel..."
     cd {{CONFIG}}
     
-    # Add KSU configuration
+    # 添加 KSU 配置
     echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
     
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "CONFIG_KSU_WITH_KPROBES=n" >> ./common/arch/arm64/configs/gki_defconfig
     fi
     
-    # Add SUSFS configuration if enabled
+    # 如启用 SUSFS，添加相关配置
     if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
         echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
         echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -244,14 +244,14 @@ configure:
         fi
     fi
     
-    # Add additional configurations
+    # 添加额外配置
     echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
     
-    # Add BBR Config
+    # 添加 BBR 配置
     echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -259,10 +259,10 @@ configure:
     echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
     echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig
     
-    # Remove check_defconfig
+    # 移除 check_defconfig
     sed -i 's/check_defconfig//' ./common/build.config.gki
     
-    # Change kernel name
+    # 修改内核名称
     perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
     sed -i '$s|echo "\$res"|echo "\$res-🍻-blehSU-🍻"|' ./common/scripts/setlocalversion
     
@@ -275,7 +275,7 @@ configure:
         sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-🍻-blehSU-🍻"/' ./common/arch/arm64/configs/gki_defconfig
     fi
 
-# Build kernel
+# 构建内核
 build:
     #!/bin/bash
     echo "Building kernel..."
@@ -292,24 +292,24 @@ build:
     
     ccache --show-stats
 
-# Create boot images
+# 生成 boot 镜像
 create-bootimg:
     #!/bin/bash
     echo "Creating boot images..."
     
-    # Create bootimgs folder
+    # 创建 bootimgs 文件夹
     mkdir -p bootimgs
     
     cd {{CONFIG}}
     
     if [ -f "build/build.sh" ]; then
-        # For build.sh method
+        # build.sh 方式
         cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image ../bootimgs/
         cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image.lz4 ../bootimgs/
         cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image ../
         cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image.lz4 ../
     else
-        # For bazel method
+        # bazel 方式
         cp ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
         cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
         cp ./bazel-bin/common/kernel_aarch64/Image ../
@@ -318,13 +318,13 @@ create-bootimg:
     
     cd ..
     
-    # Create gzip of the Image file
+    # 对 Image 文件进行 gzip 压缩
     gzip -n -k -f -9 ./Image > ./Image.gz
     
     cd bootimgs
     gzip -n -k -f -9 ./Image > ./Image.gz
     
-    # Create boot images for Android 13
+    # 为 Android 13 生成 boot 镜像
     echo "Building boot.img"
     {{MKBOOTIMG_DIR}}/mkbootimg.py --header_version 4 --kernel Image --output boot.img
     {{TOOLCHAIN_DIR}}/linux-x86/bin/avbtool add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key {{TOOLCHAIN_DIR}}/linux-x86/share/avb/testkey_rsa2048.pem
@@ -340,7 +340,7 @@ create-bootimg:
     {{TOOLCHAIN_DIR}}/linux-x86/bin/avbtool add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key {{TOOLCHAIN_DIR}}/linux-x86/share/avb/testkey_rsa2048.pem
     cp ./boot-lz4.img ../{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot-lz4.img
 
-# Create AnyKernel3 flashable zip
+# 生成 AnyKernel3 可刷 zip 包
 create-anykernel:
     #!/bin/bash
     ZIP_NAME="{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
@@ -355,7 +355,7 @@ create-anykernel:
     zip -r "../$ZIP_NAME" ./*
     rm ./Image
 
-# Compress images
+# 压缩镜像文件
 compress-images:
     @echo "Compressing boot images..."
     for image in *.img; do \
@@ -364,19 +364,19 @@ compress-images:
         fi \
     done
 
-# Clean build artifacts
+# 清理构建产物
 clean:
     @echo "Cleaning build artifacts..."
     rm -rf bootimgs
     rm -f *.img *.img.gz *.zip Image Image.gz Image.lz4
 
-# Clean everything including dependencies
+# 全部清理（包括依赖）
 clean-all: clean
     @echo "Cleaning all files..."
     rm -rf kernel-build-tools mkbootimg git-repo
     rm -rf AnyKernel3 susfs4ksu kernel_patches
 
-# Complete build process
+# 一键完整构建流程
 cook: setup download-gki apply-kernelsu apply-susfs apply-patches configure build create-bootimg create-anykernel compress-images
     @echo ""
     @echo "🎉 Build completed successfully!"
@@ -387,7 +387,7 @@ cook: setup download-gki apply-kernelsu apply-susfs apply-patches configure buil
     @echo ""
     @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
 
-# Show build status
+# 显示构建状态
 status:
     @echo "Build Status:"
     @echo "============="
