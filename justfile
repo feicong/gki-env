@@ -120,7 +120,13 @@ apply-kernelsu:
     #!/bin/bash
     echo "Applying KernelSU patches..."
     cd {{CONFIG}}
-    
+
+    # 检查 KernelSU 是否已补丁（软链接存在即跳过）
+    if [ -L common/drivers/kernelsu/kernel ]; then
+        echo "KernelSU 已补丁，跳过 setup.sh。"
+        exit 0
+    fi
+
     # 判断分支
     if [[ "{{KERNELSU_BRANCH}}" == "Stable" ]]; then
         BRANCH=""
@@ -129,7 +135,7 @@ apply-kernelsu:
     elif [[ "{{KERNELSU_BRANCH}}" == "Dev" && "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         BRANCH="-s next"
     fi
-    
+
     # 应用 KernelSU
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         echo "Adding KernelSU Official..."
