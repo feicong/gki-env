@@ -63,6 +63,34 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-x64",
             "configurationProvider": "mesonbuild.mesonbuild"
+        },
+        {
+            "name": "Android13 arm64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "android13-5.15-167/common",
+                "android13-5.15-167/common/include",
+                "android13-5.15-167/common/kernel",
+                "android13-5.15-167/common/arch/arm64/include",
+                "android13-5.15-167/common/arch/arm/include"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "MODULE"
+            ],
+            "compilerArgs": [
+                "-nostdinc",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/kconfig.h",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/compiler_types.h",
+                "-Wno-declaration-after-statement"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-gcc-arm64",
+            "configurationProvider": "mesonbuild.mesonbuild"
         }
     ],
     "version": 4
