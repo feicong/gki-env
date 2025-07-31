@@ -429,12 +429,14 @@ cook: setup download-gki apply-kernelsu configure build create-bootimg create-an
     @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
 
 cpuinfo:
+    #!/bin/bash
     @echo "Building cpuinfo module..."
-    cd modules/cpuinfo
-    make
+    @head -30 /proc/cpuinfo
+    @sudo dmesg -C
+    cd modules/cpuinfo && make clean && make
     @echo "cpuinfo module built successfully."
-    @sudo rmmod cpuinfo.ko || true
-    @sudo dmesg -C
-    @sudo insmod cpuinfo.ko
-    @sudo dmesg -C
+    sudo insmod cpuinfo.ko
+    head -30 /proc/cpuinfo
+    sudo rmmod cpuinfo.ko
+    @echo "cpuinfo module removed successfully."
     
