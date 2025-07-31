@@ -1,5 +1,5 @@
 # Copyright (C) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
-obj-m += cpuinfo.o
+obj-m += diamorphine.o
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD  := $(shell pwd)
@@ -11,8 +11,8 @@ clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
 insmod:
-	sudo insmod cpuinfo.ko
+	sudo insmod diamorphine.ko
 
 rmmod:
-	sudo rmmod cpuinfo.ko
+	sudo rmmod diamorphine.ko
 

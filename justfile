@@ -428,15 +428,17 @@ cook: setup download-gki apply-kernelsu configure build create-bootimg create-an
     @echo ""
     @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
 
+# 构建 cpuinfo 模块
 cpuinfo:
     #!/bin/bash
     @echo "Building cpuinfo module..."
     @head -30 /proc/cpuinfo
-    @sudo dmesg -C
     cd modules/cpuinfo && make clean && make
-    @echo "cpuinfo module built successfully."
-    sudo insmod cpuinfo.ko
-    head -30 /proc/cpuinfo
-    sudo rmmod cpuinfo.ko
-    @echo "cpuinfo module removed successfully."
-    
+    echo "cpuinfo module built successfully."
+
+# 构建 diamorphine Rootkit模块
+diamorphine:
+    #!/bin/bash
+    @echo "Building diamorphine module..."
+    cd modules/diamorphine && make clean && make
+    echo "diamorphine module built successfully."
