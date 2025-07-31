@@ -427,3 +427,14 @@ cook: setup download-gki apply-kernelsu configure build create-bootimg create-an
     @echo "  - {{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
     @echo ""
     @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
+
+cpuinfo:
+    @echo "Building cpuinfo module..."
+    cd modules/cpuinfo
+    make
+    @echo "cpuinfo module built successfully."
+    @sudo rmmod cpuinfo.ko || true
+    @sudo dmesg -C
+    @sudo insmod cpuinfo.ko
+    @sudo dmesg -C
+    
