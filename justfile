@@ -411,8 +411,8 @@ clean-all: clean
     rm -rf kernel-build-tools mkbootimg git-repo
     rm -rf AnyKernel3 susfs4ksu kernel_patches
 
-# 一键完整构建流程
-cook: setup download-gki apply-kernelsu apply-susfs apply-patches configure build create-bootimg create-anykernel compress-images
+# 一键完整构建流程（默认只应用 KernelSU 补丁，不自动应用 SUSFS 和其它补丁）
+cook: setup download-gki apply-kernelsu configure build create-bootimg create-anykernel compress-images
     @echo ""
     @echo "🎉 Build completed successfully!"
     @echo ""
