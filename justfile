@@ -451,9 +451,10 @@ cpuinfo-android:
     export LTO=thin
     export LANG=en_US.UTF-8
     export KCFLAGS=-D__ANDROID_COMMON_KERNEL__
+    export LLVM=1
     cd modules/cpuinfo
-    make clean CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
-    make LLVM=1 CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
+    make clean
+    make CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
 
 # 构建 diamorphine Rootkit模块
 diamorphine:
