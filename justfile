@@ -1,13 +1,16 @@
-# Android 13 GKI 5.15 内核构建脚本，支持 KernelSU
 
-# 默认配置
-ANDROID_VERSION := "android13"
-KERNEL_VERSION := "5.15"
-SUB_LEVEL := "167"
-OS_PATCH_LEVEL := "2024-11"
-KERNELSU_VARIANT := "KSU"  # Options: KSU, KSU_NEXT, MKSU
-KERNELSU_BRANCH := "Stable"  # Options: Stable, Dev, Other
-INCLUDE_SUSFS := "true"
+# Android GKI 5.15 内核构建脚本，支持 KernelSU
+# 支持通过 env 文件配置参数，支持安卓13/14/15/16 多版本编译
+
+# 优先加载指定 env 文件，未指定则默认加载 .env.android13
+ENV_FILE := ".env.android13"
+export ANDROID_VERSION := env_var_or_default("ANDROID_VERSION", "android13")
+export KERNEL_VERSION := env_var_or_default("KERNEL_VERSION", "5.15")
+export SUB_LEVEL := env_var_or_default("SUB_LEVEL", "167")
+export OS_PATCH_LEVEL := env_var_or_default("OS_PATCH_LEVEL", "2024-11")
+export KERNELSU_VARIANT := env_var_or_default("KERNELSU_VARIANT", "KSU")
+export KERNELSU_BRANCH := env_var_or_default("KERNELSU_BRANCH", "Stable")
+export INCLUDE_SUSFS := env_var_or_default("INCLUDE_SUSFS", "true")
 
 # 目录设置
 WORKSPACE := justfile_directory()
@@ -154,26 +157,41 @@ apply-susfs:
     cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
     cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
     
-    # 应用不同变体的补丁
+    # 应用不同变体的补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         echo "Applying SUSFS patches for Official KernelSU..."
         cd ./KernelSU
         cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-        patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch
+        if patch -p1 --dry-run -N < 10_enable_susfs_for_ksu.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+            echo "10_enable_susfs_for_ksu.patch 已应用，跳过。"
+        else
+            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch
+        fi
     elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "Applying SUSFS patches for KernelSU-Next..."
         cd ./KernelSU-Next
         cp ../../kernel_patches/next/kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch ./
-        patch -p1 --forward --fuzz=3 < kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch || true
+        if patch -p1 --dry-run -N < kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+            echo "kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch 已应用，跳过。"
+        else
+            patch -p1 --forward --fuzz=3 < kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch || true
+        fi
     elif [[ "{{KERNELSU_VARIANT}}" == "MKSU" ]]; then
         echo "Applying SUSFS patches for MKSU..."
         cd ./KernelSU
         cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-        patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
+        if patch -p1 --dry-run -N < 10_enable_susfs_for_ksu.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+            echo "10_enable_susfs_for_ksu.patch 已应用，跳过。"
+        else
+            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
+        fi
     fi
-    
     cd ../common
-    patch -p1 --fuzz=3 < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch || true
+    if patch -p1 --dry-run -N < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+        echo "50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch 已应用，跳过。"
+    else
+        patch -p1 --fuzz=3 < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch || true
+    fi
 
 # 应用其他补丁
 apply-patches:
@@ -181,30 +199,46 @@ apply-patches:
     echo "Applying additional patches..."
     cd {{CONFIG}}
     
-    # KSU 变体应用 All Managers 补丁
+    # KSU 变体应用 All Managers 补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         cd KernelSU
         if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
             cp ../../kernel_patches/apk_sign.c_fix.patch ./
-            patch -p1 --fuzz=3 < apk_sign.c_fix.patch
+            if patch -p1 --dry-run -N < apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+                echo "apk_sign.c_fix.patch 已应用，跳过。"
+            else
+                patch -p1 --fuzz=3 < apk_sign.c_fix.patch
+            fi
         else
             cp ../../kernel_patches/no-susfs_apk_sign.c_fix.patch ./
-            patch -p1 --fuzz=3 < no-susfs_apk_sign.c_fix.patch
+            if patch -p1 --dry-run -N < no-susfs_apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+                echo "no-susfs_apk_sign.c_fix.patch 已应用，跳过。"
+            else
+                patch -p1 --fuzz=3 < no-susfs_apk_sign.c_fix.patch
+            fi
         fi
         cd ..
     fi
-    
-    # 应用 hooks 补丁
+
+    # 应用 hooks 补丁（已应用则跳过）
     cd common
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "Applying hooks for KernelSU-Next..."
         cp ../../kernel_patches/next/syscall_hooks.patch ./
-        patch -p1 -F 3 < syscall_hooks.patch
+        if patch -p1 --dry-run -N < syscall_hooks.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+            echo "syscall_hooks.patch 已应用，跳过。"
+        else
+            patch -p1 -F 3 < syscall_hooks.patch
+        fi
     fi
-    
-    # 应用隐藏补丁
+
+    # 应用隐藏补丁（已应用则跳过）
     cp ../../kernel_patches/69_hide_stuff.patch ./
-    patch -p1 -F 3 < 69_hide_stuff.patch
+    if patch -p1 --dry-run -N < 69_hide_stuff.patch | grep -q 'Reversed (or previously applied) patch detected'; then
+        echo "69_hide_stuff.patch 已应用，跳过。"
+    else
+        patch -p1 -F 3 < 69_hide_stuff.patch
+    fi
 
 # 配置内核
 configure:
