@@ -436,6 +436,25 @@ cpuinfo:
     cd modules/cpuinfo && make clean && make
     echo "cpuinfo module built successfully."
 
+cpuinfo-android:
+    #!/bin/bash
+    export ARCH=arm64
+    export SUBARCH=arm64
+    export CROSS_COMPILE=arm64-linux-android-
+    export PATH={{CONFIG}}/build/kernel/build-tools/path/linux-x86:{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin:{{CONFIG}}/out/android13-5.15/common/host_tools:$PATH
+    export CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
+    export KERNEL_SRC={{WORKSPACE}}/{{CONFIG}}/out/android13-5.15/common
+    export CLANG_VERSION=r450784e
+    export LC_ADDRESS=zh_CN.UTF-8
+    export LC_NAME=zh_CN.UTF-8
+    export OBJSIZE=llvm-size
+    export LTO=thin
+    export LANG=en_US.UTF-8
+    export KCFLAGS=-D__ANDROID_COMMON_KERNEL__
+    cd modules/cpuinfo
+    make clean CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
+    make LLVM=1 CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
+
 # 构建 diamorphine Rootkit模块
 diamorphine:
     #!/bin/bash
