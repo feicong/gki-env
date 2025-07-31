@@ -1,4 +1,4 @@
-
+# Copyright (C) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
 # 安卓GKI内核构建脚本，支持 KernelSU
 
 # 支持通过 env 文件配置参数，支持安卓13/14/15 多版本编译
