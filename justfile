@@ -427,16 +427,3 @@ cook: setup download-gki apply-kernelsu configure build create-bootimg create-an
     @echo "  - {{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
     @echo ""
     @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
-
-# 显示构建状态
-status:
-    @echo "Build Status:"
-    @echo "============="
-    @if [ -d "{{CONFIG}}" ]; then echo "✓ GKI source downloaded"; else echo "✗ GKI source not found"; fi
-    @if [ -d "kernel-build-tools" ]; then echo "✓ Toolchain downloaded"; else echo "✗ Toolchain not found"; fi
-    @if [ -d "AnyKernel3" ]; then echo "✓ AnyKernel3 downloaded"; else echo "✗ AnyKernel3 not found"; fi
-    @if [ -d "susfs4ksu" ]; then echo "✓ SUSFS downloaded"; else echo "✗ SUSFS not found"; fi
-    @if [ -d "kernel_patches" ]; then echo "✓ Kernel patches downloaded"; else echo "✗ Kernel patches not found"; fi
-    @echo ""
-    @if [ -f "*.zip" ]; then echo "Built packages:"; ls -la *.zip 2>/dev/null || true; fi
-    @if [ -f "*.img.gz" ]; then echo "Built images:"; ls -la *.img.gz 2>/dev/null || true; fi
