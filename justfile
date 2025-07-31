@@ -37,7 +37,7 @@ setup:
     
     # 安装系统依赖
     sudo apt update
-    sudo apt install -y ccache curl git python3 python3-pip build-essential bc bison flex libssl-dev libelf-dev
+    sudo apt install -y bazel-bootstrap ccache curl git python3 python3-pip build-essential bc bison flex libssl-dev libelf-dev
     
     # 配置 ccache
     mkdir -p ~/.cache/bazel
