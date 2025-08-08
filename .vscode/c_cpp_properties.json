@@ -3,7 +3,6 @@
         {
             "name": "Linux arm64",
             "includePath": [
-                "${workspaceFolder}/**",
                 "/usr/src/linux-headers-**/include",
                 "/usr/src/linux-headers-**/include/uapi",
                 "/usr/src/linux-headers-**/include/generated/uapi",
@@ -35,7 +34,6 @@
         {
             "name": "Linux x86_64",
             "includePath": [
-                "${workspaceFolder}/**",
                 "/usr/src/linux-headers-**/include",
                 "/usr/src/linux-headers-**/include/uapi",
                 "/usr/src/linux-headers-**/include/generated/uapi",
@@ -67,12 +65,17 @@
         {
             "name": "Android13 arm64",
             "includePath": [
-                "${workspaceFolder}/**",
                 "android13-5.15-167/common",
                 "android13-5.15-167/common/include",
+                "android13-5.15-167/common/include/uapi",
                 "android13-5.15-167/common/kernel",
                 "android13-5.15-167/common/arch/arm64/include",
-                "android13-5.15-167/common/arch/arm/include"
+                "android13-5.15-167/common/arch/arm64/include/uapi",
+                "android13-5.15-167/common/arch/arm/include",
+                "android13-5.15-167/out/android13-5.15/common/include",
+                "android13-5.15-167/out/android13-5.15/common/arch/arm64/include",
+                "android13-5.15-167/out/android13-5.15/common/arch/arm64/include/generated",
+                "android13-5.15-167/out/android13-5.15/common/usr/include"
             ],
             "defines": [
                 "__KERNEL__",
@@ -81,9 +84,7 @@
             "compilerArgs": [
                 "-nostdinc",
                 "-include",
-                "/usr/src/linux-headers-**/include/linux/kconfig.h",
-                "-include",
-                "/usr/src/linux-headers-**/include/linux/compiler_types.h",
+                "android13-5.15-167/out/android13-5.15/common/include/generated/autoconf.h",
                 "-Wno-declaration-after-statement"
             ],
             "compilerPath": "/usr/bin/gcc",

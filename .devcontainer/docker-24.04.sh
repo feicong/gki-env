@@ -76,11 +76,15 @@ fi
 sudo apt-get update &&
 	sudo apt-get install -y libzstd-dev libedit-dev cmake vim \
 		lsb-release software-properties-common tree sed wget apt-file \
-		gnupg gnupg2 unzip ninja-build git python3-dev python3-pip python3-venv \
-		libelf-dev x11-apps patchelf curl xz-utils build-essential file flex bison \
+		gnupg gnupg2 unzip ninja-build git python3 python3-dev python3-pip python3-venv \
+		libelf-dev x11-apps patchelf curl xz-utils build-essential file flex bc bison \
 		tzdata qemu-user ca-certificates iputils-ping gperf pkg-config socat ltrace strace openjdk-21-jdk \
-		help2man autoconf gawk libtool-bin libncurses-dev texinfo unifdef p7zip-full libc6-dev &&
-	apt-file update
+		help2man autoconf gawk libtool-bin libncurses-dev texinfo unifdef p7zip-full libc6-dev \
+		bazel-bootstrap ccache libssl-dev && apt-file update
+
+wget -qO - 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr.pub' | gpg --dearmor | sudo tee /usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg 1> /dev/null
+echo "deb [arch=all,$(dpkg --print-architecture) signed-by=/usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg] https://proget.makedeb.org prebuilt-mpr $(lsb_release -cs)" | sudo tee /etc/apt/sources.list.d/prebuilt-mpr.list
+sudo apt update && sudo apt install -y just
 
 ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ >/etc/timezone
 
