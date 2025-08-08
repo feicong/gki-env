@@ -1,0 +1,92 @@
+{
+	"name": "gki-env",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	// "image": "fsx199/gki-env:latest",
+	"build": {
+        "context": ".",
+        "dockerfile": "./Dockerfile",
+		// "cacheFrom": "fsx199/gki-env:latest",
+		"args": {
+			// "http_proxy": "http://192.168.0.120:7890",
+			// "https_proxy": "http://192.168.0.120:7890"
+		}
+    },
+	"containerEnv": {
+		// "HTTP_PROXY": "${localEnv:http_proxy}",
+		// "HTTPS_PROXY": "${localEnv:http_proxy}",
+		// "http_proxy": "${localEnv:http_proxy}",
+		// "https_proxy": "${localEnv:http_proxy}"
+		"DISPLAY": "host.docker.internal:0"
+	},
+	
+	"runArgs": [
+		"--cap-add=SYS_PTRACE", 
+		"--security-opt", 
+		"seccomp=unconfined",
+		"--volume=/var/lib/docker",
+        "--privileged"
+	],
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"ms-vscode.cmake-tools",
+				"formulahendry.code-runner",
+				"ms-vscode.cpptools-themes",
+				"ms-vscode.makefile-tools",
+				"ms-azuretools.vscode-docker",
+				"mesonbuild.mesonbuild",
+				"ms-python.debugpy",
+				"prince781.vala",
+				"vadimcn.vscode-lldb",
+				"DavidAnson.vscode-markdownlint",
+				"MS-CEINTL.vscode-language-pack-zh-hans",
+				"jebbs.plantuml",
+				"redhat.vscode-yaml",
+				"ms-python.vscode-pylance",
+				"rogalmic.bash-debug",
+				"ms-vscode-remote.remote-containers",
+				"github.remotehub",
+				"ms-vscode-remote.remote-ssh",
+				"ms-vscode-remote.remote-ssh-edit",
+				"ms-vscode-remote.vscode-remote-extensionpack",
+				"ms-vscode.remote-server",
+				"ms-vscode.remote-explorer",
+				"vscode-icons-team.vscode-icons",
+				"github.copilot",
+				"golang.go",
+				"ms-python.isort",
+				"redhat.vscode-xml",
+				"ms-vscode.cpptools-extension-pack",
+				"ms-vscode.hexeditor",
+				"foxundermoon.shell-format",
+				"vscjava.vscode-java-pack",
+				"OmarDulaimi.breakpoint-bookmarks"
+			]
+		}
+	},
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+        //"ghcr.io/devcontainers/features/github-cli": "latest",
+        // "ghcr.io/devcontainers/features/docker-in-docker": "latest"
+        //"ghcr.io/devcontainers/features/python": "3.12",
+		//"ghcr.io/devcontainers/features/go:1": {
+        //	"version": "1.24.4"
+		//}//,
+		// "ghcr.io/devcontainers/features/node:1": {
+		// 	"version": "22"
+		// }
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "uname -a && echo 'https://github.com/feicong/feicong-course by feicong.'",
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	"remoteUser": "vscode"
+}
