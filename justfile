@@ -89,7 +89,7 @@ download-deps:
     fi
     # 克隆内核补丁
     if [ ! -d "kernel_patches" ]; then
-        git clone https://github.com/ukriu/kernel_patches.git --depth 1
+        git clone https://github.com/WildKernels/kernel_patches.git --depth 1
     fi
 
 # 下载 GKI 内核源码
