@@ -80,7 +80,7 @@ sudo apt-get update &&
 		libelf-dev x11-apps patchelf curl xz-utils build-essential file flex bc bison \
 		tzdata qemu-user ca-certificates iputils-ping gperf pkg-config socat ltrace strace openjdk-21-jdk \
 		help2man autoconf gawk libtool-bin libncurses-dev texinfo unifdef p7zip-full libc6-dev \
-		bazel-bootstrap ccache libssl-dev && apt-file update
+		bazel-bootstrap ccache libssl-dev pahole && apt-file update
 
 wget -qO - 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr.pub' | gpg --dearmor | sudo tee /usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg 1> /dev/null
 echo "deb [arch=all,$(dpkg --print-architecture) signed-by=/usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg] https://proget.makedeb.org prebuilt-mpr $(lsb_release -cs)" | sudo tee /etc/apt/sources.list.d/prebuilt-mpr.list

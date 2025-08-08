@@ -79,6 +79,7 @@
             ],
             "defines": [
                 "__KERNEL__",
+                "__ANDROID_COMMON_KERNEL__",
                 "MODULE"
             ],
             "compilerArgs": [

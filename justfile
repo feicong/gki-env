@@ -442,7 +442,7 @@ cpuinfo-android:
     export SUBARCH=arm64
     export CROSS_COMPILE=arm64-linux-android-
     export PATH={{CONFIG}}/build/kernel/build-tools/path/linux-x86:{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin:{{CONFIG}}/out/android13-5.15/common/host_tools:$PATH
-    export CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang
+    export CC=clang
     export KERNEL_SRC={{WORKSPACE}}/{{CONFIG}}/out/android13-5.15/common
     export CLANG_VERSION=r450784e
     export LC_ADDRESS=zh_CN.UTF-8
