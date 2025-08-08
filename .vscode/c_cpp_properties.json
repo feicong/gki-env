@@ -1,0 +1,97 @@
+{
+    "configurations": [
+        {
+            "name": "Linux arm64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/src/linux-headers-**/include",
+                "/usr/src/linux-headers-**/include/uapi",
+                "/usr/src/linux-headers-**/include/generated/uapi",
+                "/usr/src/linux-headers-**/arch/arm64/include",
+                "/usr/src/linux-headers-**/arch/arm64/include/uapi",
+                "/usr/src/linux-headers-**/arch/arm64/include/generated",
+                "/usr/src/linux-headers-**/arch/arm64/include/generated/uapi",
+                "/usr/lib/gcc/aarch64-linux-gnu/11/include/",
+                "/usr/include"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "MODULE"
+            ],
+            "compilerArgs": [
+                "-nostdinc",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/kconfig.h",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/compiler_types.h",
+                "-Wno-declaration-after-statement"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-gcc-arm64",
+            "configurationProvider": "mesonbuild.mesonbuild"
+        },
+        {
+            "name": "Linux x86_64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/src/linux-headers-**/include",
+                "/usr/src/linux-headers-**/include/uapi",
+                "/usr/src/linux-headers-**/include/generated/uapi",
+                "/usr/src/linux-headers-**/arch/x86/include",
+                "/usr/src/linux-headers-**/arch/x86/include/uapi",
+                "/usr/src/linux-headers-**/arch/x86/include/generated",
+                "/usr/src/linux-headers-**/arch/x86/include/generated/uapi",
+                "/usr/lib/gcc/x86_64-linux-gnu/11/include/",
+                "/usr/include"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "MODULE"
+            ],
+            "compilerArgs": [
+                "-nostdinc",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/kconfig.h",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/compiler_types.h",
+                "-Wno-declaration-after-statement"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "mesonbuild.mesonbuild"
+        },
+        {
+            "name": "Android13 arm64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "android13-5.15-167/common",
+                "android13-5.15-167/common/include",
+                "android13-5.15-167/common/kernel",
+                "android13-5.15-167/common/arch/arm64/include",
+                "android13-5.15-167/common/arch/arm/include"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "MODULE"
+            ],
+            "compilerArgs": [
+                "-nostdinc",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/kconfig.h",
+                "-include",
+                "/usr/src/linux-headers-**/include/linux/compiler_types.h",
+                "-Wno-declaration-after-statement"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-gcc-arm64",
+            "configurationProvider": "mesonbuild.mesonbuild"
+        }
+    ],
+    "version": 4
+}
