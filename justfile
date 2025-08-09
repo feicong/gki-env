@@ -291,13 +291,9 @@ configure:
     # 修改内核名称
     perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
     
-    if [ -f "build/build.sh" ]; then
-        sed -i 's/-dirty//' ./common/scripts/setlocalversion
-    else
-        sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
-        rm -rf ./common/android/abi_gki_protected_exports_*
-        sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-    fi
+    sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
+    rm -rf ./common/android/abi_gki_protected_exports_*
+    sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
 
 # 构建gki内核
 build-gki:
@@ -308,11 +304,7 @@ build-gki:
     set -e
     set -x
     
-    if [ -f "build/build.sh" ]; then
-        LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang"
-    else
-        tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist
-    fi
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist
     
     ccache --show-stats
 
@@ -325,11 +317,7 @@ build-cvd-kernel:
     set -e
     set -x
     
-    if [ -f "build/build.sh" ]; then
-        BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.aarch64 build/build.sh CC="/usr/bin/ccache clang"
-    else
-        tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_aarch64_dist
-    fi
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_aarch64_dist
     
     ccache --show-stats
 
@@ -342,11 +330,7 @@ build-cvd-kernel-x86_64:
     set -e
     set -x
     
-    if [ -f "build/build.sh" ]; then
-        BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.x86_64 build/build.sh CC="/usr/bin/ccache clang"
-    else
-        tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
-    fi
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
     
     ccache --show-stats
 
@@ -360,19 +344,11 @@ create-bootimg:
     
     cd {{CONFIG}}
     
-    if [ -f "build/build.sh" ]; then
-        # build.sh 方式
-        cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image ../bootimgs/
-        cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image.lz4 ../bootimgs/
-        cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image ../
-        cp ./out/{{ANDROID_VERSION}}-{{KERNEL_VERSION}}/dist/Image.lz4 ../
-    else
-        # bazel 方式
-        cp ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
-        cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
-        cp ./bazel-bin/common/kernel_aarch64/Image ../
-        cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../
-    fi
+    # bazel 方式
+    cp ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
+    cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
+    cp ./bazel-bin/common/kernel_aarch64/Image ../
+    cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../
     
     cd ..
     
