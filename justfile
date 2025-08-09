@@ -207,7 +207,7 @@ apply-patches:
     echo "正在应用其他补丁..."
     cd {{CONFIG}}
     
-    # KSU 变体应用 All Managers 补丁（已应用则跳过）
+    # KSU 变体应用 Managers 补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         cd KernelSU
         if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
@@ -306,7 +306,6 @@ configure:
     
     # 修改内核名称
     perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
-    sed -i '$s|echo "\$res"|echo "\$res-🍻-blehSU-🍻"|' ./common/scripts/setlocalversion
     
     if [ -f "build/build.sh" ]; then
         sed -i 's/-dirty//' ./common/scripts/setlocalversion
@@ -314,7 +313,6 @@ configure:
         sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
         rm -rf ./common/android/abi_gki_protected_exports_*
         sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-        sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-🍻-blehSU-🍻"/' ./common/arch/arm64/configs/gki_defconfig
     fi
 
 # 构建GSI内核
@@ -461,13 +459,13 @@ reset:
     repo forall -c "git clean -fd"
 
 # 构建CVD内核
-cook-cvd: setup download-gki configure build-cvd-kernel-x86_64
+cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
 
 # 构建GSI内核并打包（应用 KernelSU 补丁）
-cook-gsi: setup download-gki apply-kernelsu configure build-gsi create-bootimg create-anykernel compress-images
+cook-gsi: setup download-gki apply-kernelsu build-gsi create-bootimg create-anykernel compress-images
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
