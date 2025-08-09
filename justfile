@@ -46,9 +46,6 @@ setup:
     ccache --max-size=2G
     ccache --set-config=compression=true
     
-    # 如未下载则下载工具链
-    # just download-toolchain
-    
     # 安装 repo 工具
     mkdir -p {{WORKSPACE}}/git-repo
     if [ ! -f {{WORKSPACE}}/git-repo/repo ]; then
@@ -58,19 +55,6 @@ setup:
     fi
     
     echo "环境设置完成！"
-
-# 下载工具链
-download-toolchain:
-    #!/bin/bash
-    if [ -d "{{TOOLCHAIN_DIR}}" ] && [ -d "{{MKBOOTIMG_DIR}}" ]; then
-        echo "工具链已存在，跳过下载"
-        exit 0
-    fi
-    echo "正在下载工具链..."
-    AOSP_MIRROR=https://android.googlesource.com
-    BRANCH=main-kernel-build-2024
-    git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 {{TOOLCHAIN_DIR}}
-    git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 {{MKBOOTIMG_DIR}}
 
 # 下载依赖（AnyKernel3、SUSFS、内核补丁）
 download-deps:
@@ -459,13 +443,13 @@ reset:
     repo forall -c "git clean -fd"
 
 # 构建CVD内核
-cook-cvd: setup download-gki download-toolchain build-cvd-kernel-x86_64
+cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
 
 # 构建gki内核并打包（应用 KernelSU 补丁）
-cook-gki: setup download-gki download-toolchain apply-kernelsu build-gki create-bootimg create-anykernel compress-images
+cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel compress-images
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
