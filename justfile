@@ -315,8 +315,8 @@ configure:
         sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
     fi
 
-# 构建GSI内核
-build-gsi:
+# 构建gki内核
+build-gki:
     #!/bin/bash
     echo "正在编译内核..."
     cd {{CONFIG}}
@@ -464,8 +464,8 @@ cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo "Build completed successfully!"
     @echo ""
 
-# 构建GSI内核并打包（应用 KernelSU 补丁）
-cook-gsi: setup download-gki apply-kernelsu build-gsi create-bootimg create-anykernel compress-images
+# 构建gki内核并打包（应用 KernelSU 补丁）
+cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel compress-images
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
