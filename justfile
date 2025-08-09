@@ -452,6 +452,14 @@ clean-all: clean
     rm -rf kernel-build-tools mkbootimg git-repo
     rm -rf AnyKernel3 susfs4ksu kernel_patches
 
+# 重置repo代码
+reset:
+    #!/bin/bash
+    @echo "重置 repo 代码..."
+    cd {{CONFIG}}
+    repo forall -c "git reset --hard"
+    repo forall -c "git clean -fd"
+
 # 构建CVD内核
 cook-cvd: setup download-gki configure build-cvd-kernel-x86_64
     @echo ""
