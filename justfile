@@ -317,8 +317,8 @@ configure:
         sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-🍻-blehSU-🍻"/' ./common/arch/arm64/configs/gki_defconfig
     fi
 
-# 构建内核
-build:
+# 构建GSI内核
+build-gsi:
     #!/bin/bash
     echo "正在编译内核..."
     cd {{CONFIG}}
@@ -334,7 +334,41 @@ build:
     
     ccache --show-stats
 
-# 生成 boot 镜像
+# 构建CVD内核
+build-cvd-kernel:
+    #!/bin/bash
+    echo "正在编译 CVD 内核..."
+    cd {{CONFIG}}
+    
+    set -e
+    set -x
+    
+    if [ -f "build/build.sh" ]; then
+        LTO=thin BUILD_CONFIG=common-modules/virtual-device/build.config.cuttlefish.aarch64 build/build.sh CC="/usr/bin/ccache clang"
+    else
+        tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_aarch64_dist
+    fi
+    
+    ccache --show-stats
+
+# 构建CVD内核
+build-cvd-kernel-x86_64:
+    #!/bin/bash
+    echo "正在编译 CVD 内核..."
+    cd {{CONFIG}}
+    
+    set -e
+    set -x
+    
+    if [ -f "build/build.sh" ]; then
+        LTO=thin BUILD_CONFIG=common-modules/virtual-device/build.config.cuttlefish.x86_64 build/build.sh CC="/usr/bin/ccache clang"
+    else
+        tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
+    fi
+    
+    ccache --show-stats
+
+# 生成 boot.img 镜像
 create-bootimg:
     #!/bin/bash
     echo "正在生成 boot 镜像..."
@@ -418,14 +452,14 @@ clean-all: clean
     rm -rf kernel-build-tools mkbootimg git-repo
     rm -rf AnyKernel3 susfs4ksu kernel_patches
 
-# # 构建CVD内核
-# cook: setup download-gki configure build
-#     @echo ""
-#     @echo "Build completed successfully!"
-#     @echo ""
+# 构建CVD内核
+cook-cvd: setup download-gki configure build-cvd-kernel-x86_64
+    @echo ""
+    @echo "Build completed successfully!"
+    @echo ""
 
-# 构建GSI内核（应用 KernelSU 补丁）
-cook-gsi: setup download-gki apply-kernelsu configure build create-bootimg create-anykernel compress-images
+# 构建GSI内核并打包（应用 KernelSU 补丁）
+cook-gsi: setup download-gki apply-kernelsu configure build-gsi create-bootimg create-anykernel compress-images
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
