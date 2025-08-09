@@ -16,8 +16,8 @@ export INCLUDE_SUSFS := env_var_or_default("INCLUDE_SUSFS", "true")
 # 目录设置
 WORKSPACE := justfile_directory()
 CONFIG := ANDROID_VERSION + "-" + KERNEL_VERSION + "-" + SUB_LEVEL
-TOOLCHAIN_DIR := ANDROID_VERSION + "/prebuilts/kernel-build-tools"
-MKBOOTIMG_DIR := ANDROID_VERSION + "/tools/mkbootimg/"
+TOOLCHAIN_DIR := CONFIG + "/prebuilts/kernel-build-tools"
+MKBOOTIMG_DIR := CONFIG + "/tools/mkbootimg/"
 
 # 环境变量
 export https_proxy := env_var_or_default("https_proxy", "")
