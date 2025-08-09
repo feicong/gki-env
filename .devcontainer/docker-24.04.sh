@@ -76,9 +76,9 @@ fi
 sudo apt-get update &&
 	sudo apt-get install -y libzstd-dev libedit-dev cmake vim \
 		lsb-release software-properties-common tree sed wget apt-file \
-		gnupg gnupg2 unzip ninja-build git python3 python3-dev python3-pip python3-venv \
-		libelf-dev x11-apps patchelf curl xz-utils build-essential file flex bc bison \
-		tzdata qemu-user ca-certificates iputils-ping gperf pkg-config socat ltrace strace openjdk-21-jdk \
+		gnupg gnupg2 unzip ninja-build git python3 python3-dev python3-pip \
+		libelf-dev curl xz-utils build-essential file flex bc bison \
+		tzdata qemu-user ca-certificates iputils-ping gperf pkg-config socat ltrace strace \
 		help2man autoconf gawk libtool-bin libncurses-dev texinfo unifdef p7zip-full libc6-dev \
 		bazel-bootstrap ccache libssl-dev pahole && apt-file update
 
@@ -91,4 +91,3 @@ ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ >/etc/timezone
 # pip setup
 pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 pip3 install -U pip --user --break-system-packages
-pip3 install lief ninja meson typing-extensions colorama prompt-toolkit pygments graphlib --user --break-system-packages
