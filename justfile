@@ -47,7 +47,7 @@ setup:
     ccache --set-config=compression=true
     
     # 如未下载则下载工具链
-    just download-toolchain
+    # just download-toolchain
     
     # 安装 repo 工具
     mkdir -p {{WORKSPACE}}/git-repo
@@ -459,13 +459,13 @@ reset:
     repo forall -c "git clean -fd"
 
 # 构建CVD内核
-cook-cvd: setup download-gki build-cvd-kernel-x86_64
+cook-cvd: setup download-gki download-toolchain build-cvd-kernel-x86_64
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
 
 # 构建gki内核并打包（应用 KernelSU 补丁）
-cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel compress-images
+cook-gki: setup download-gki download-toolchain apply-kernelsu build-gki create-bootimg create-anykernel compress-images
     @echo ""
     @echo "Build completed successfully!"
     @echo ""
