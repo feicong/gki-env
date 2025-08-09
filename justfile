@@ -344,7 +344,7 @@ build-cvd-kernel:
     set -x
     
     if [ -f "build/build.sh" ]; then
-        LTO=thin BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.aarch64 build/build.sh CC="/usr/bin/ccache clang"
+        BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.aarch64 build/build.sh CC="/usr/bin/ccache clang"
     else
         tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_aarch64_dist
     fi
@@ -361,7 +361,7 @@ build-cvd-kernel-x86_64:
     set -x
     
     if [ -f "build/build.sh" ]; then
-        LTO=thin BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.x86_64 build/build.sh CC="/usr/bin/ccache clang"
+        BUILD_CONFIG=common-modules/virtual-device/build.config.virtual_device.x86_64 build/build.sh CC="/usr/bin/ccache clang"
     else
         tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
     fi
