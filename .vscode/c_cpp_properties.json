@@ -95,7 +95,9 @@
             "compilerArgs": [
                 "-nostdinc",
                 "-include",
-                "android13-5.15-167/out/android13-5.15/common/include/generated/autoconf.h",
+                "android13-5.15-*/common/include/linux/kconfig.h",
+                "-include",
+                "android13-5.15-*/common/include/linux/compiler_types.h",
                 "-Wno-declaration-after-statement"
             ],
             "compilerPath": "/usr/bin/gcc",
