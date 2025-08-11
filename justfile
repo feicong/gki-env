@@ -416,6 +416,7 @@ cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anyk
     @echo "生成文件："
     @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
+    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo ""
 
 # 构建 cpuinfo 模块
