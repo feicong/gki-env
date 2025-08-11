@@ -16,8 +16,8 @@ export INCLUDE_SUSFS := env_var_or_default("INCLUDE_SUSFS", "true")
 # 目录设置
 WORKSPACE := justfile_directory()
 CONFIG := ANDROID_VERSION + "-" + KERNEL_VERSION + "-" + SUB_LEVEL
-TOOLCHAIN_DIR := CONFIG + "/prebuilts/kernel-build-tools"
-MKBOOTIMG_DIR := CONFIG + "/tools/mkbootimg/"
+TOOLCHAIN_DIR := WORKSPACE + "/" + CONFIG + "/prebuilts/kernel-build-tools"
+MKBOOTIMG_DIR := WORKSPACE + "/" + CONFIG + "/tools/mkbootimg"
 
 # 环境变量
 export https_proxy := env_var_or_default("https_proxy", "")
@@ -344,35 +344,28 @@ create-bootimg:
     
     cd {{CONFIG}}
     
-    # bazel 方式
-    cp ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
-    cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
-    cp ./bazel-bin/common/kernel_aarch64/Image ../
-    cp ./bazel-bin/common/kernel_aarch64/Image.lz4 ../
-    
-    cd ..
-    
-    # 对 Image 文件进行 gzip 压缩
+    cp -f ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
+    cp -f ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
+
+    cd ../bootimgs/
     gzip -n -k -f -9 ./Image > ./Image.gz
     
-    cd bootimgs
-    gzip -n -k -f -9 ./Image > ./Image.gz
-    
-    # 为 Android 13 生成 boot 镜像
     echo "生成 boot.img 镜像"
     {{MKBOOTIMG_DIR}}/mkbootimg.py --header_version 4 --kernel Image --output boot.img
     {{TOOLCHAIN_DIR}}/linux-x86/bin/avbtool add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key {{TOOLCHAIN_DIR}}/linux-x86/share/avb/testkey_rsa2048.pem
-    cp ./boot.img ../{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot.img
+    mv -f ./boot.img ./{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot.img
     
     echo "生成 boot-gz.img 镜像"
     {{MKBOOTIMG_DIR}}/mkbootimg.py --header_version 4 --kernel Image.gz --output boot-gz.img
     {{TOOLCHAIN_DIR}}/linux-x86/bin/avbtool add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key {{TOOLCHAIN_DIR}}/linux-x86/share/avb/testkey_rsa2048.pem
-    cp ./boot-gz.img ../{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot-gz.img
+    mv -f ./boot-gz.img ./{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot-gz.img
     
     echo "生成 boot-lz4.img 镜像"
     {{MKBOOTIMG_DIR}}/mkbootimg.py --header_version 4 --kernel Image.lz4 --output boot-lz4.img
     {{TOOLCHAIN_DIR}}/linux-x86/bin/avbtool add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key {{TOOLCHAIN_DIR}}/linux-x86/share/avb/testkey_rsa2048.pem
-    cp ./boot-lz4.img ../{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot-lz4.img
+    mv -f ./boot-lz4.img ./{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot-lz4.img
+
+    cd ..
 
 # 生成 AnyKernel3 可刷 zip 包
 create-anykernel:
@@ -387,7 +380,7 @@ create-anykernel:
     echo "正在打包 zip 文件: $ZIP_NAME..."
     cp ../Image ./Image
     zip -r "../$ZIP_NAME" ./*
-    rm ./Image
+    rm -f ./Image
 
 # 压缩镜像文件
 compress-images:
