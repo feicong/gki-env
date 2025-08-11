@@ -382,15 +382,6 @@ create-anykernel:
     zip -r "../bootimgs/$ZIP_NAME" ./*
     rm -f ./Image
 
-# 压缩镜像文件
-compress-images:
-    @echo "Compressing boot images..."
-    for image in *.img; do \
-        if [ -f "$image" ]; then \
-            gzip -vnf9 "$image"; \
-        fi \
-    done
-
 # 清理构建产物
 clean:
     @echo "Cleaning build artifacts..."
@@ -418,7 +409,7 @@ cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
 
 # 构建gki内核并打包（应用 KernelSU 补丁）
-cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel compress-images
+cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel
     @echo ""
     @echo "构建完成！"
     @echo ""
