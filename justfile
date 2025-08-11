@@ -371,15 +371,15 @@ create-bootimg:
 create-anykernel:
     #!/bin/bash
     ZIP_NAME="{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
-    if [ -f "../$ZIP_NAME" ]; then
+    if [ -f "../bootimgs/$ZIP_NAME" ]; then
         echo "$ZIP_NAME 已存在，跳过。"
         exit 0
     fi
     echo "正在生成 AnyKernel3 刷机包..."
     cd AnyKernel3 && rm -rf .git/
     echo "正在打包 zip 文件: $ZIP_NAME..."
-    cp ../Image ./Image
-    zip -r "../$ZIP_NAME" ./*
+    cp ../bootimgs/Image ./Image
+    zip -r "../bootimgs/$ZIP_NAME" ./*
     rm -f ./Image
 
 # 压缩镜像文件
