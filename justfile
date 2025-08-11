@@ -414,19 +414,18 @@ reset:
 # 构建CVD内核
 cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
-    @echo "Build completed successfully!"
+    @echo "构建模拟器内核完成！"
     @echo ""
 
 # 构建gki内核并打包（应用 KernelSU 补丁）
 cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel compress-images
     @echo ""
-    @echo "Build completed successfully!"
+    @echo "构建完成！"
     @echo ""
-    @echo "Generated files:"
-    @echo "  - {{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
-    @echo "  - {{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
+    @echo "生成文件："
+    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
+    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
     @echo ""
-    @echo "Flash the AnyKernel3 zip via custom recovery or use boot images with fastboot."
 
 # 构建 cpuinfo 模块
 cpuinfo:
