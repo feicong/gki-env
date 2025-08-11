@@ -104,12 +104,20 @@ download-gki: download-deps
 # 应用 KernelSU 补丁
 apply-kernelsu:
     #!/bin/bash
+    set -e
     echo "正在应用 KernelSU 补丁..."
     cd {{CONFIG}}
 
-    # 检查 KernelSU 是否已补丁（软链接存在即跳过）
-    if [ -L common/drivers/kernelsu/kernel ]; then
-        echo "KernelSU 补丁已应用，跳过 setup.sh。"
+    KERNEL_LINK="common/drivers/kernelsu/kernel"
+
+    # 检查是否已有 kernel 软链接
+    if [ -L "$KERNEL_LINK" ]; then
+        echo "KernelSU 补丁已应用（软链接指向：$REAL_PATH），跳过 setup.sh。"
+        exit 0
+    fi
+
+    if [ -d "KernelSU/kernel" ]; then
+        echo "KernelSU 目录存在，跳过 setup.sh。"
         exit 0
     fi
 
