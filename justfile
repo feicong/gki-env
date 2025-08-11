@@ -18,6 +18,7 @@ WORKSPACE := justfile_directory()
 CONFIG := ANDROID_VERSION + "-" + KERNEL_VERSION + "-" + SUB_LEVEL
 TOOLCHAIN_DIR := WORKSPACE + "/" + CONFIG + "/prebuilts/kernel-build-tools"
 MKBOOTIMG_DIR := WORKSPACE + "/" + CONFIG + "/tools/mkbootimg"
+DIST_DIR := WORKSPACE + "/dist"
 
 # 环境变量
 export https_proxy := env_var_or_default("https_proxy", "")
@@ -339,15 +340,14 @@ create-bootimg:
     #!/bin/bash
     echo "正在生成 boot 镜像..."
     
-    # 创建 bootimgs 文件夹
-    mkdir -p bootimgs
+    mkdir -p {{DIST_DIR}}
     
     cd {{CONFIG}}
     
-    cp -f ./bazel-bin/common/kernel_aarch64/Image ../bootimgs/
-    cp -f ./bazel-bin/common/kernel_aarch64/Image.lz4 ../bootimgs/
+    cp -f ./bazel-bin/common/kernel_aarch64/Image {{DIST_DIR}}
+    cp -f ./bazel-bin/common/kernel_aarch64/Image.lz4 {{DIST_DIR}}
 
-    cd ../bootimgs/
+    cd {{DIST_DIR}}
     gzip -n -k -f -9 ./Image > ./Image.gz
     
     echo "生成 boot.img 镜像"
@@ -371,21 +371,21 @@ create-bootimg:
 create-anykernel:
     #!/bin/bash
     ZIP_NAME="{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
-    if [ -f "../bootimgs/$ZIP_NAME" ]; then
+    if [ -f "{{DIST_DIR}}/$ZIP_NAME" ]; then
         echo "$ZIP_NAME 已存在，跳过。"
         exit 0
     fi
     echo "正在生成 AnyKernel3 刷机包..."
     cd AnyKernel3 && rm -rf .git/
     echo "正在打包 zip 文件: $ZIP_NAME..."
-    cp ../bootimgs/Image ./Image
-    zip -r "../bootimgs/$ZIP_NAME" ./*
+    cp {{DIST_DIR}}/Image ./Image
+    zip -r "{{DIST_DIR}}/$ZIP_NAME" ./*
     rm -f ./Image
 
 # 清理构建产物
 clean:
     @echo "Cleaning build artifacts..."
-    rm -rf bootimgs
+    rm -rf {{DIST_DIR}}
     rm -f *.img *.img.gz *.zip Image Image.gz Image.lz4
 
 # 全部清理（包括依赖）
@@ -414,9 +414,9 @@ cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anyk
     @echo "构建完成！"
     @echo ""
     @echo "生成文件："
-    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
-    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
-    @echo "  - bootimgs/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
+    @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
+    @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
+    @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo ""
 
 # 构建 cpuinfo 模块
