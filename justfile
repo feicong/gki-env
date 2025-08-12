@@ -318,9 +318,9 @@ build-gki:
     ccache --show-stats
 
 # 构建CVD内核
-build-cvd-kernel:
+build-cvd-kernel-aarch64:
     #!/bin/bash
-    echo "正在编译 CVD 内核..."
+    echo "正在编译 aarch64 CVD 内核..."
     cd {{CONFIG}}
     
     set -e
@@ -333,7 +333,7 @@ build-cvd-kernel:
 # 构建CVD内核
 build-cvd-kernel-x86_64:
     #!/bin/bash
-    echo "正在编译 CVD 内核..."
+    echo "正在编译 x86_64 CVD 内核..."
     cd {{CONFIG}}
     
     set -e
@@ -410,10 +410,16 @@ reset:
     repo forall -c "git reset --hard"
     repo forall -c "git clean -fd"
 
-# 构建CVD内核
+# 构建x86_64 CVD内核
 cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
-    @echo "构建模拟器内核完成！"
+    @echo "构建 x86_64 模拟器内核完成！"
+    @echo ""
+
+# 构建aarch64 CVD内核
+cook-cvd-aarch64: setup download-gki build-cvd-kernel-aarch64
+    @echo ""
+    @echo "构建 aarch64 模拟器内核完成！"
     @echo ""
 
 # 构建gki内核并打包（应用 KernelSU 补丁）
