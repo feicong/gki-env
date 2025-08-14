@@ -1,0 +1,153 @@
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 330b92ea8..33b2649e5 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -142,6 +142,10 @@ static int c_show(struct seq_file *m, void *v)
+ 	int i, j;
+ 	bool compat = personality(current->personality) == PER_LINUX32;
+ 
++	// seq_printf(m, "processor\t: %d\n", 32);
++	// seq_printf(m, "model name\t: %s\n", "ARMv8 Processor rev 0 (v8l)");
++	// return 0;
++
+ 	for_each_online_cpu(i) {
+ 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+ 		u32 midr = cpuinfo->reg_midr;
+diff --git a/arch/x86/kernel/cpu/proc.c b/arch/x86/kernel/cpu/proc.c
+index 4eec8889b..50e29c071 100644
+--- a/arch/x86/kernel/cpu/proc.c
++++ b/arch/x86/kernel/cpu/proc.c
+@@ -64,6 +64,18 @@ static int show_cpuinfo(struct seq_file *m, void *v)
+ 	unsigned int cpu;
+ 	int i;
+ 
++	// seq_printf(m, "processor\t: %u\n"
++	// 	   "vendor_id\t: %s\n"
++	// 	   "cpu family\t: %d\n"
++	// 	   "model\t\t: %u\n"
++	// 	   "model name\t: %s\n",
++	// 	   1,
++	// 	   "GenuineIntel",
++	// 	   6,
++	// 	   151,
++	// 	   "12th Gen Intel(R) Core(TM) i9-12900");
++	// return 0;
++	
+ 	cpu = c->cpu_index;
+ 	seq_printf(m, "processor\t: %u\n"
+ 		   "vendor_id\t: %s\n"
+diff --git a/fs/proc/array.c b/fs/proc/array.c
+index 9f479adef..f07e50cf0 100644
+--- a/fs/proc/array.c
++++ b/fs/proc/array.c
+@@ -127,7 +127,7 @@ static const char * const task_state_array[] = {
+ 	"S (sleeping)",		/* 0x01 */
+ 	"D (disk sleep)",	/* 0x02 */
+ 	"T (stopped)",		/* 0x04 */
+-	"t (tracing stop)",	/* 0x08 */
++	"R (running)", // "t (tracing stop)",	/* 0x08 */
+ 	"X (dead)",		/* 0x10 */
+ 	"Z (zombie)",		/* 0x20 */
+ 	"P (parked)",		/* 0x40 */
+@@ -182,7 +182,7 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
+ 	seq_put_decimal_ull(m, "\nNgid:\t", ngid);
+ 	seq_put_decimal_ull(m, "\nPid:\t", pid_nr_ns(pid, ns));
+ 	seq_put_decimal_ull(m, "\nPPid:\t", ppid);
+-	seq_put_decimal_ull(m, "\nTracerPid:\t", tpid);
++	seq_put_decimal_ull(m, "\nTracerPid:\t", /*tpid*/0);
+ 	seq_put_decimal_ull(m, "\nUid:\t", from_kuid_munged(user_ns, cred->uid));
+ 	seq_put_decimal_ull(m, "\t", from_kuid_munged(user_ns, cred->euid));
+ 	seq_put_decimal_ull(m, "\t", from_kuid_munged(user_ns, cred->suid));
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index d56513a56..81f39768b 100644
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -280,6 +280,9 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+ 	unsigned long start, end;
+ 	dev_t dev = 0;
+ 	const char *name = NULL;
++	struct proc_maps_private *priv = m->private;
++	char path_buf[PATH_MAX] = {0};
++	char *path = NULL;
+ 
+ 	if (file) {
+ 		struct inode *inode = file_inode(vma->vm_file);
+@@ -290,6 +293,39 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+ 
+ 	start = vma->vm_start;
+ 	end = vma->vm_end;
++
++	// printk(KERN_INFO "[feicong] comm:%s\n", priv->task->comm);
++	if (strstr(priv->task->comm, "droid.settings")) {
++		// 过滤掉 rwx segment
++		if ((flags & (VM_READ | VM_WRITE | VM_EXEC)) == (VM_READ | VM_WRITE | VM_EXEC)) {
++			printk(KERN_INFO "[feicong] delete rwx segment\n");
++			return;
++		}
++
++		// 如果有 file 结构
++		if (file) {
++			const char *fname = file->f_path.dentry->d_name.name;
++			// 用 dentry 名过滤不需要路径解析
++			if (strstr(fname, "frida-agent") ||
++				strstr(fname, "jit-cache")) {
++				printk(KERN_INFO "[feicong] skip %s\n", fname);
++				return;
++			}
++
++			// 必要时再解析路径
++			path = d_path(&file->f_path, path_buf, sizeof(path_buf));
++			if (IS_ERR(path))
++				path = "(unknown)";
++
++			if (strstr(path, "libgadget.so") ||
++				strstr(path, "/data/local/tmp/") ||
++				strstr(path, "frida-agent-64.so")) {
++				printk(KERN_INFO "[feicong] skip %s\n", path);
++				return;
++			}
++		}
++	}
++
+ 	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+ 
+ 	/*
+diff --git a/fs/readdir.c b/fs/readdir.c
+index 09e8ed7d4..86bf7d311 100644
+--- a/fs/readdir.c
++++ b/fs/readdir.c
+@@ -21,6 +21,7 @@
+ #include <linux/unistd.h>
+ #include <linux/compat.h>
+ #include <linux/uaccess.h>
++#include <linux/string.h>
+ 
+ #include <asm/unaligned.h>
+ 
+@@ -317,6 +318,11 @@ static int filldir64(struct dir_context *ctx, const char *name, int namlen,
+ 		sizeof(u64));
+ 	int prev_reclen;
+ 
++	if (strstr(name, "frida-server")) {
++		printk(KERN_INFO "[feicong] skip %s\n", name);
++		return 0;
++	}
++
+ 	buf->error = verify_dirent_name(name, namlen);
+ 	if (unlikely(buf->error))
+ 		return buf->error;
+diff --git a/init/version.c b/init/version.c
+index 1a356f549..ce4114451 100644
+--- a/init/version.c
++++ b/init/version.c
+@@ -22,8 +22,8 @@ struct uts_namespace init_uts_ns = {
+ 	.name = {
+ 		.sysname	= UTS_SYSNAME,
+ 		.nodename	= UTS_NODENAME,
+-		.release	= UTS_RELEASE,
+-		.version	= UTS_VERSION,
++		.release	= "5.15.41-android13-8-00055-g4f5025129fe8-ab8949913", // UTS_RELEASE,
++		.version	= "#1 SMP PREEMPT Mon Aug 15 18:33:14 UTC 2022", // UTS_VERSION,
+ 		.machine	= UTS_MACHINE,
+ 		.domainname	= UTS_DOMAINNAME,
+ 	},
