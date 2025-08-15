@@ -468,8 +468,8 @@ cook-cvd-aarch64: setup download-gki build-cvd-kernel-aarch64
     @echo "构建 aarch64 模拟器内核完成！"
     @echo ""
 
-# 构建gki内核并打包（应用 KernelSU 补丁）
-cook-gki: setup download-gki apply-kernelsu build-gki create-bootimg create-anykernel
+# 构建gki内核并打包
+cook-gki: setup download-gki build-gki create-bootimg create-anykernel
     @echo ""
     @echo "构建完成！"
     @echo ""
