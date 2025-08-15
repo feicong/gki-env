@@ -3,6 +3,13 @@
         "*.c": "c",
         "*.h": "c",
         "*.cpp": "cpp",
+        "__bit_reference": "c",
+        "algorithm": "c",
+        "chrono": "c",
+        "map": "c",
+        "set": "c",
+        "unordered_map": "c",
+        "unordered_set": "c"
     },
     "files.exclude": {
         "**/*.d": true,
