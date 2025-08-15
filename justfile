@@ -108,39 +108,52 @@ apply-kernelsu:
     echo "正在应用 KernelSU 补丁..."
     cd {{CONFIG}}/common
 
-    KERNEL_LINK="drivers/kernelsu/kernel"
-
-    # 检查是否已有 kernel 软链接
-    if [ -L "$KERNEL_LINK" ]; then
-        echo "KernelSU 补丁已应用（软链接指向：$REAL_PATH），跳过 setup.sh。"
-        exit 0
-    fi
-
     # 判断分支
+    BRANCH_ARG=""
     if [[ "{{KERNELSU_BRANCH}}" == "Stable" ]]; then
-        BRANCH=""
-    elif [[ "{{KERNELSU_BRANCH}}" == "Dev" && ( "{{KERNELSU_VARIANT}}" == "KSU" || "{{KERNELSU_VARIANT}}" == "MKSU" ) ]]; then
-        BRANCH="-s main"
-    elif [[ "{{KERNELSU_BRANCH}}" == "Dev" && "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
-        BRANCH="-s next"
+        BRANCH_ARG=""
+    elif [[ "{{KERNELSU_BRANCH}}" == "Dev" ]]; then
+        if [[ "{{KERNELSU_VARIANT}}" == "KSU" || "{{KERNELSU_VARIANT}}" == "MKSU" ]]; then
+            BRANCH_ARG="-s main"
+        elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
+            BRANCH_ARG="-s next"
+        elif [[ "{{KERNELSU_VARIANT}}" == "WILD" ]]; then
+            BRANCH_ARG="-s wild"
+        fi
     fi
 
     # 应用 KernelSU
-    if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
-        # if [ -f "KernelSU/kernel/setup.sh" ]; then
-        #     echo "KernelSU 补丁应用..."
-        #     bash KernelSU/kernel/setup.sh $BRANCH
-        #     exit 0
-        # fi
-        echo "添加 KernelSU 官方版本..."
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
-    elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
-        echo "添加 KernelSU Next 版本..."
-        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
-    elif [[ "{{KERNELSU_VARIANT}}" == "MKSU" ]]; then
-        echo "添加 KernelSU MKSU 版本..."
-        curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
-    fi
+    case "{{KERNELSU_VARIANT}}" in
+        "KSU")
+            if [ -d "./drivers/kernelsu" ]; then
+                echo "KernelSU 补丁已应用，跳过。"
+                exit 0
+            fi
+            echo "正在添加 KernelSU 补丁..."
+            if [ -d "KernelSU" ]; then
+                bash KernelSU/kernel/setup.sh $BRANCH_ARG
+                rm -rf ./drivers/kernelsu
+                cp -r -f KernelSU/kernel ./drivers/kernelsu
+                sed -i 's/^.*ccflags-y += -DKSU_VERSION=.*$/ccflags-y += -DKSU_VERSION=12345/' ./drivers/kernelsu/Makefile
+                echo "KernelSU 本地添加补丁成功。"
+                exit 0
+            fi
+            echo "添加 KernelSU 官方版本..."
+            curl -LSs "https://ghfast.top/https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            ;;
+        "KSU_NEXT")
+            echo "添加 KernelSU Next 版本..."
+            curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            ;;
+        "MKSU")
+            echo "添加 KernelSU MKSU 版本..."
+            curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            ;;
+        "WILD")
+            echo "添加 Wild KSU 版本..."
+            curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            ;;
+    esac
 
 # 应用 SUSFS 补丁
 apply-susfs:
@@ -161,8 +174,8 @@ apply-susfs:
     # 应用不同变体的补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         echo "为 KernelSU 官方版应用 SUSFS 补丁..."
-        cd ./KernelSU
-        cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+        cd ./common/KernelSU
+        cp ../../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
         if patch -p1 --dry-run -N < 10_enable_susfs_for_ksu.patch | grep -q 'Reversed (or previously applied) patch detected'; then
             echo "10_enable_susfs_for_ksu.patch 已应用，跳过。"
         else
@@ -170,8 +183,8 @@ apply-susfs:
         fi
     elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "为 KernelSU-Next 应用 SUSFS 补丁..."
-        cd ./KernelSU-Next
-        cp ../../kernel_patches/next/kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch ./
+        cd ./common/KernelSU-Next
+        cp ../../../kernel_patches/next/kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch ./
         if patch -p1 --dry-run -N < kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch | grep -q 'Reversed (or previously applied) patch detected'; then
             echo "kernel-patch-susfs-v1.5.7-to-KernelSU-Next.patch 已应用，跳过。"
         else
@@ -179,20 +192,21 @@ apply-susfs:
         fi
     elif [[ "{{KERNELSU_VARIANT}}" == "MKSU" ]]; then
         echo "应用 SUSFS 补丁..."
-        cd ./KernelSU
-        cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+        cd ./common/KernelSU
+        cp ../../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
         if patch -p1 --dry-run -N < 10_enable_susfs_for_ksu.patch | grep -q 'Reversed (or previously applied) patch detected'; then
             echo "10_enable_susfs_for_ksu.patch 已应用，跳过。"
         else
             patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
         fi
     fi
-    cd ../common
+    cd ../
     if patch -p1 --dry-run -N < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch | grep -q 'Reversed (or previously applied) patch detected'; then
     echo "50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch 已应用，跳过。"
     else
         patch -p1 --fuzz=3 < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch || true
     fi
+    echo "SUSFS 补丁应用完成。"
 
 # 应用其他补丁
 apply-patches:
@@ -202,16 +216,16 @@ apply-patches:
     
     # KSU 变体应用 Managers 补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
-        cd KernelSU
+        cd common/KernelSU
         if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
-            cp ../../kernel_patches/apk_sign.c_fix.patch ./
+            cp ../../../kernel_patches/apk_sign.c_fix.patch ./
             if patch -p1 --dry-run -N < apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
                 echo "apk_sign.c_fix.patch 已应用，跳过。"
             else
                 patch -p1 --fuzz=3 < apk_sign.c_fix.patch
             fi
         else
-            cp ../../kernel_patches/no-susfs_apk_sign.c_fix.patch ./
+            cp ../../../kernel_patches/no-susfs_apk_sign.c_fix.patch ./
             if patch -p1 --dry-run -N < no-susfs_apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
                 echo "no-susfs_apk_sign.c_fix.patch 已应用，跳过。"
             else
@@ -222,10 +236,9 @@ apply-patches:
     fi
 
     # 应用 hooks 补丁（已应用则跳过）
-    cd common
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "为 KernelSU-Next 应用 hooks 补丁..."
-        cp ../../kernel_patches/next/syscall_hooks.patch ./
+        cp ../../../kernel_patches/next/syscall_hooks.patch ./
         if patch -p1 --dry-run -N < syscall_hooks.patch | grep -q 'Reversed (or previously applied) patch detected'; then
             echo "syscall_hooks.patch 已应用，跳过。"
         else
@@ -240,6 +253,7 @@ apply-patches:
     else
         patch -p1 -F 3 < 69_hide_stuff.patch
     fi
+    echo "其他补丁应用完成。"
 
 # 配置内核
 configure:
@@ -247,52 +261,76 @@ configure:
     echo "正在配置内核..."
     cd {{CONFIG}}
     
-    # 添加 KSU 配置
-    echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
+    GKI_DEFCONFIG_ARM64="./common/arch/arm64/configs/gki_defconfig"
+    GKI_DEFCONFIG_X86="./common/arch/x86/configs/gki_defconfig"
+
+    # 为 arm64 和 x86 添加 KSU 配置
+    echo "CONFIG_KSU=y" >> ${GKI_DEFCONFIG_ARM64}
+    echo "CONFIG_KSU=y" >> ${GKI_DEFCONFIG_X86}
     
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
-        echo "CONFIG_KSU_WITH_KPROBES=n" >> ./common/arch/arm64/configs/gki_defconfig
+        echo "CONFIG_KSU_WITH_KPROBES=n" >> ${GKI_DEFCONFIG_ARM64}
+        echo "CONFIG_KSU_WITH_KPROBES=n" >> ${GKI_DEFCONFIG_X86}
     fi
     
-    # 如启用 SUSFS，添加相关配置
+    # 如启用 SUSFS，为 arm64 和 x86 添加相关配置
     if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
-        echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+        SUSFS_CONFIGS=(
+            "CONFIG_KSU_SUSFS=y"
+            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_PATH=y"
+            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
+            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"
+            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
+            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+        )
+        for config in "${SUSFS_CONFIGS[@]}"; do
+            echo "$config" >> ${GKI_DEFCONFIG_ARM64}
+            echo "$config" >> ${GKI_DEFCONFIG_X86}
+        done
         
         if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ${GKI_DEFCONFIG_ARM64}
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ${GKI_DEFCONFIG_X86}
         else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ${GKI_DEFCONFIG_ARM64}
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ${GKI_DEFCONFIG_X86}
         fi
     fi
     
-    # 添加额外配置
-    echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-    
-    # 添加 BBR 配置
-    echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
-    echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig
+    # 为 arm64 和 x86 添加额外配置
+    EXTRA_CONFIGS=(
+        "CONFIG_TMPFS_XATTR=y"
+        "CONFIG_TMPFS_POSIX_ACL=y"
+        "CONFIG_IP_NF_TARGET_TTL=y"
+        "CONFIG_IP6_NF_TARGET_HL=y"
+        "CONFIG_IP6_NF_MATCH_HL=y"
+    )
+    for config in "${EXTRA_CONFIGS[@]}"; do
+        echo "$config" >> ${GKI_DEFCONFIG_ARM64}
+        echo "$config" >> ${GKI_DEFCONFIG_X86}
+    done
+
+    # 为 arm64 添加 BBR 配置
+    BBR_CONFIGS=(
+        "CONFIG_TCP_CONG_ADVANCED=y"
+        "CONFIG_TCP_CONG_BBR=y"
+        "CONFIG_NET_SCH_FQ=y"
+        "CONFIG_TCP_CONG_BIC=n"
+        "CONFIG_TCP_CONG_WESTWOOD=n"
+        "CONFIG_TCP_CONG_HTCP=n"
+    )
+    for config in "${BBR_CONFIGS[@]}"; do
+        echo "$config" >> ${GKI_DEFCONFIG_ARM64}
+    done
     
     # 移除 check_defconfig
     sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -303,6 +341,7 @@ configure:
     sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
     rm -rf ./common/android/abi_gki_protected_exports_*
     sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+    echo "内核配置已完成。"
 
 # 构建gki内核
 build-gki:
@@ -342,6 +381,7 @@ build-cvd-kernel-x86_64:
     tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
     
     ccache --show-stats
+    echo "编译完成！"
 
 # 生成 boot.img 镜像
 create-bootimg:
