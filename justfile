@@ -67,7 +67,7 @@ download-deps:
     echo "正在下载依赖..."
     # 克隆 AnyKernel3
     if [ ! -d "AnyKernel3" ]; then
-        git clone https://github.com/osm0sis/AnyKernel3.git -b gki --depth 1
+        git clone https://github.com/KernelSU-Next/AnyKernel3.git -b gki --depth 1
     fi
     # 克隆 SUSFS
     if [ ! -d "susfs4ksu" ]; then
@@ -106,18 +106,13 @@ apply-kernelsu:
     #!/bin/bash
     set -e
     echo "正在应用 KernelSU 补丁..."
-    cd {{CONFIG}}
+    cd {{CONFIG}}/common
 
-    KERNEL_LINK="common/drivers/kernelsu/kernel"
+    KERNEL_LINK="drivers/kernelsu/kernel"
 
     # 检查是否已有 kernel 软链接
     if [ -L "$KERNEL_LINK" ]; then
         echo "KernelSU 补丁已应用（软链接指向：$REAL_PATH），跳过 setup.sh。"
-        exit 0
-    fi
-
-    if [ -d "KernelSU/kernel" ]; then
-        echo "KernelSU 目录存在，跳过 setup.sh。"
         exit 0
     fi
 
@@ -132,6 +127,11 @@ apply-kernelsu:
 
     # 应用 KernelSU
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
+        # if [ -f "KernelSU/kernel/setup.sh" ]; then
+        #     echo "KernelSU 补丁应用..."
+        #     bash KernelSU/kernel/setup.sh $BRANCH
+        #     exit 0
+        # fi
         echo "添加 KernelSU 官方版本..."
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
     elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
@@ -414,6 +414,12 @@ reset:
 cook-cvd: setup download-gki build-cvd-kernel-x86_64
     @echo ""
     @echo "构建 x86_64 模拟器内核完成！"
+    @echo ""
+
+# 构建x86_64 KernelSU CVD内核
+cook-cvd-ksu: setup download-gki apply-kernelsu apply-susfs apply-patches configure build-cvd-kernel-x86_64
+    @echo ""
+    @echo "构建 x86_64 KernelSU 模拟器内核完成！"
     @echo ""
 
 # 构建aarch64 CVD内核
