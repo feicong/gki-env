@@ -1,37 +1,32 @@
-/*
- * cpuinfo.c - 自定义 /proc/cpuinfo 钩子模块
- * 
- * 这个模块会钩住 /proc/cpuinfo 的输出并为特定的 UID 或 PID 提供自定义输出
- * 支持 x86_64 和 ARM64 架构
- *
- * License: GPL-2.0
- */
+// Copyright (C) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
-#include <linux/cred.h>     // 用于 current_uid()
-#include <linux/sched.h>    // 用于 current task_struct
-#include <linux/version.h>  // 用于 KERNEL_VERSION
-#include <linux/fs.h>       // 用于 struct file
-#include <linux/syscalls.h> // 用于系统调用定义
-#include <linux/kprobes.h>  // 用于 kprobes
+#include <linux/cred.h>
+#include <linux/sched.h>
+#include <linux/version.h>
+#include <linux/fs.h>
+#include <linux/syscalls.h>
+#include <linux/kprobes.h>
+#include <linux/mm.h>
+#include <linux/uidgid.h>
+#include <asm/pgtable.h>
 
-// 用于 ARM64 架构的特殊头文件
 #ifdef CONFIG_ARM64
-#include <linux/mm_types.h>  // 用于 phys_addr_t, pgprot_t
+#include <linux/mm_types.h>
 #endif
 
-// 配置参数
-static unsigned int target_uid_val = 1000;  // 目标 UID
-static int target_pid_val = 0;              // 目标 PID (0表示不检查)
+/****************** 模块参数 ******************/
+static unsigned int target_uid_val = 1000;
+static int target_pid_val = 0;
 
 module_param(target_uid_val, uint, 0644);
 MODULE_PARM_DESC(target_uid_val, "提供自定义 cpuinfo 的目标 UID");
 module_param(target_pid_val, int, 0644);
 MODULE_PARM_DESC(target_pid_val, "提供自定义 cpuinfo 的目标 PID (0表示不检查特定PID)");
 
-// 自定义 CPU 信息输出
+/****************** 自定义输出 ******************/
 #ifdef CONFIG_X86_64
 static const char *custom_cpuinfo_output =
     "processor\t: 0\n"
@@ -68,25 +63,30 @@ static const char *custom_cpuinfo_output =
     "\n";
 #endif
 
-// 全局变量
+/****************** 全局状态 ******************/
 static int (*original_cpuinfo_show)(struct seq_file *, void *);
 static const struct seq_operations *original_cpuinfo_op;
 
-// ARM64 架构特定变量
-#ifdef CONFIG_ARM64
-// 内存保护相关函数和变量
-void (*update_mapping_prot)(phys_addr_t phys, unsigned long virt, phys_addr_t size, pgprot_t prot);
-unsigned long start_rodata;
-unsigned long init_begin;
-#define section_size (init_begin - start_rodata)
+/****************** 运行时解析的函数指针 ******************/
+/* 统一声明类型，避免编译期直接依赖符号，彻底规避 modpost undefined */
+typedef int (*set_memory_rw_t)(unsigned long addr, unsigned long numpages);
+typedef int (*set_memory_ro_t)(unsigned long addr, unsigned long numpages);
 
-// 检查是否需要定义 __pa_symbol 宏
+static set_memory_rw_t p_set_memory_rw = NULL;
+static set_memory_ro_t p_set_memory_ro = NULL;
+
+/* ARM64 ro 段回退方案 */
+#ifdef CONFIG_ARM64
+static void (*update_mapping_prot_fp)(phys_addr_t phys, unsigned long virt, phys_addr_t size, pgprot_t prot);
+static unsigned long start_rodata;
+static unsigned long init_begin;
+#define section_size (init_begin - start_rodata)
 #ifndef __pa_symbol
 #define __pa_symbol(x) __pa(x)
 #endif
 #endif
 
-// 用于查找 kallsyms_lookup_name 函数
+/****************** 符号查找（kprobe） ******************/
 static unsigned long lookup_name(const char *name)
 {
     struct kprobe kp = {
@@ -98,253 +98,297 @@ static unsigned long lookup_name(const char *name)
 
     ret = register_kprobe(&kp);
     if (ret < 0) {
-        pr_err("cpuinfo_hook: 无法注册 kprobe 查找 kallsyms_lookup_name\n");
+        pr_err("cpuinfo_hook: 无法注册 kprobe 查找 kallsyms_lookup_name，ret=%d\n", ret);
         return 0;
     }
-    
     kallsyms_lookup_name_func = (kallsyms_lookup_name_t)kp.addr;
     unregister_kprobe(&kp);
-    
+
     if (!kallsyms_lookup_name_func) {
         pr_err("cpuinfo_hook: 无法获取 kallsyms_lookup_name 地址\n");
         return 0;
     }
-    
     return kallsyms_lookup_name_func(name);
 }
 
-// 内存保护相关函数
+/****************** x86_64：CR0 WP 开关（作为回退） ******************/
 #ifdef CONFIG_X86_64
-static unsigned long cr0;
+static unsigned long saved_cr0;
 
 static inline void write_cr0_forced(unsigned long val)
 {
-    unsigned long __force_order;
-    asm volatile("mov %0, %%cr0" : "+r"(val), "+m"(__force_order));
+    /* 只保留必要约束，避免奇怪的 clobber 导致 GPF；调用方负责关抢占/关中断 */
+    asm volatile("mov %0, %%cr0" :: "r"(val) : "memory");
 }
 
-static inline void protect_memory(void)
+static inline void x86_disable_wp(void)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	write_cr0_forced(cr0);
-#else
-	write_cr0(cr0);
-#endif
+    saved_cr0 = read_cr0();
+    write_cr0_forced(saved_cr0 & ~0x00010000UL);
 }
 
-static inline void unprotect_memory(void)
+static inline void x86_enable_wp(void)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-	write_cr0_forced(cr0 & ~0x00010000);
-#else
-	write_cr0(cr0 & ~0x00010000);
-#endif
+    write_cr0_forced(saved_cr0);
 }
+#endif
+
+/****************** ARM64：ro 段映射修改（作为回退） ******************/
+#ifdef CONFIG_ARM64
+static int arm64_ro_symbols_init_once(void)
+{
+    static bool inited;
+    if (inited)
+        return 0;
+
+    update_mapping_prot_fp = (void (*)(phys_addr_t, unsigned long, phys_addr_t, pgprot_t))
+        lookup_name("update_mapping_prot");
+    if (!update_mapping_prot_fp) {
+        pr_err("cpuinfo_hook: ARM64 找不到 update_mapping_prot\n");
+        return -EINVAL;
+    }
+
+    start_rodata = lookup_name("__start_rodata");
+    if (!start_rodata) {
+        pr_err("cpuinfo_hook: ARM64 找不到 __start_rodata\n");
+        return -EINVAL;
+    }
+
+    init_begin = lookup_name("__init_begin");
+    if (!init_begin) {
+        pr_err("cpuinfo_hook: ARM64 找不到 __init_begin\n");
+        return -EINVAL;
+    }
+
+    if (start_rodata >= init_begin) {
+        pr_err("cpuinfo_hook: ARM64 ro 段边界异常: start_rodata(0x%lx) >= init_begin(0x%lx)\n",
+               start_rodata, init_begin);
+        return -EINVAL;
+    }
+
+    pr_info("cpuinfo_hook: ARM64 ro 符号就绪 start_rodata=0x%lx init_begin=0x%lx\n",
+            start_rodata, init_begin);
+    inited = true;
+    return 0;
+}
+
+static inline void arm64_ro_set_rw(void)
+{
+    if (!update_mapping_prot_fp)
+        return;
+    update_mapping_prot_fp(__pa_symbol(start_rodata), (unsigned long)start_rodata,
+                           section_size, PAGE_KERNEL);
+}
+
+static inline void arm64_ro_set_ro(void)
+{
+    if (!update_mapping_prot_fp)
+        return;
+    update_mapping_prot_fp(__pa_symbol(start_rodata), (unsigned long)start_rodata,
+                           section_size, PAGE_KERNEL_RO);
+}
+#endif
+
+/****************** set_memory_*：运行时解析与封装 ******************/
+static void resolve_set_memory_symbols(void)
+{
+    unsigned long rw = lookup_name("set_memory_rw");
+    unsigned long ro = lookup_name("set_memory_ro");
+
+    if (rw && ro) {
+        p_set_memory_rw = (set_memory_rw_t)rw;
+        p_set_memory_ro = (set_memory_ro_t)ro;
+        pr_info("cpuinfo_hook: 动态解析到 set_memory_rw=%px set_memory_ro=%px\n",
+                p_set_memory_rw, p_set_memory_ro);
+    } else {
+        pr_warn("cpuinfo_hook: 未解析到 set_memory_rw/ro，将使用回退方案\n");
+        p_set_memory_rw = NULL;
+        p_set_memory_ro = NULL;
+    }
+}
+
+static int make_addr_rw_ro_runtime(unsigned long addr, bool make_rw)
+{
+    /* 优先使用运行时解析到的 set_memory_* */
+    if (p_set_memory_rw && p_set_memory_ro) {
+        unsigned long start = addr & PAGE_MASK;
+        unsigned long end   = (addr + sizeof(struct seq_operations) - 1) & PAGE_MASK;
+        unsigned long pages = ((end - start) / PAGE_SIZE) + 1;
+        int ret;
+
+        if (make_rw) {
+            ret = p_set_memory_rw(start, pages);
+            if (ret)
+                pr_err("cpuinfo_hook: set_memory_rw 失败 addr=0x%lx pages=%lu ret=%d\n", start, pages, ret);
+            return ret;
+        } else {
+            ret = p_set_memory_ro(start, pages);
+            if (ret)
+                pr_err("cpuinfo_hook: set_memory_ro 失败 addr=0x%lx pages=%lu ret=%d\n", start, pages, ret);
+            return ret;
+        }
+    }
+
+    /* 回退路径：x86_64 / ARM64 / 其他架构 */
+#if defined(CONFIG_X86_64)
+    pr_info("cpuinfo_hook: 回退到 x86_64 CR0 WP 切换\n");
+    if (make_rw) {
+        preempt_disable();
+        local_irq_disable();
+        x86_disable_wp();
+    } else {
+        x86_enable_wp();
+        local_irq_enable();
+        preempt_enable();
+    }
+    return 0;
 
 #elif defined(CONFIG_ARM64)
-static inline void protect_memory(void)
-{
-    if (!update_mapping_prot || !start_rodata || !init_begin) {
-        pr_err("cpuinfo_hook: 无法保护内存，缺少必要的符号\n");
-        return;
-    }
-    
-    if (start_rodata >= init_begin) {
-        pr_err("cpuinfo_hook: 无效的段边界: start_rodata (0x%lx) >= init_begin (0x%lx)\n",
-               start_rodata, init_begin);
-        return;
-    }
-    
-    update_mapping_prot(__pa_symbol(start_rodata), (unsigned long)start_rodata,
-                       section_size, PAGE_KERNEL_RO);
-}
+    pr_info("cpuinfo_hook: 回退到 ARM64 ro 段映射方案\n");
+    if (arm64_ro_symbols_init_once() != 0)
+        return -EINVAL;
+    if (make_rw)
+        arm64_ro_set_rw();
+    else
+        arm64_ro_set_ro();
+    return 0;
 
-static inline void unprotect_memory(void)
-{
-    if (!update_mapping_prot || !start_rodata || !init_begin) {
-        pr_err("cpuinfo_hook: 无法解除内存保护，缺少必要的符号\n");
-        return;
-    }
-    
-    if (start_rodata >= init_begin) {
-        pr_err("cpuinfo_hook: 无效的段边界: start_rodata (0x%lx) >= init_begin (0x%lx)\n",
-               start_rodata, init_begin);
-        return;
-    }
-    
-    update_mapping_prot(__pa_symbol(start_rodata), (unsigned long)start_rodata,
-                       section_size, PAGE_KERNEL);
-}
+#else
+    /* 其他架构：无法安全地改页权限，只能假定可写（不推荐，仅兜底） */
+    pr_warn("cpuinfo_hook: 其他架构未提供安全改写手段，直接写入（存在风险）\n");
+    return 0;
 #endif
+}
 
-// 自定义的 show_cpuinfo 函数
+/****************** 自定义 show 函数 ******************/
 static int custom_show_cpuinfo(struct seq_file *m, void *v)
 {
-    kuid_t current_kuid;
-    pid_t current_pid;
+    kuid_t current_kuid = current_uid();
+    pid_t current_pid = current->pid;
+    uid_t uid = __kuid_val(current_kuid);
     bool should_override = false;
 
-    // 获取当前进程的 PID 和 UID
-    current_pid = current->pid;
-    current_kuid = current_uid();
+    pr_debug("cpuinfo_hook: Hook 激活 PID=%d UID=%u (目标 UID=%u, PID=%d)\n",
+             current_pid, uid, target_uid_val, target_pid_val);
 
-    // 记录访问信息
-    pr_debug("cpuinfo_hook: Hook 被激活 PID %d, UID %u (目标 UID: %u)\n", 
-             current_pid, current_kuid.val, target_uid_val);
-
-    // UID 检查
-    if (target_uid_val != 0 && current_kuid.val == target_uid_val) {
+    if (target_uid_val != 0 && uid == target_uid_val) {
         should_override = true;
         pr_debug("cpuinfo_hook: UID 匹配 %u\n", target_uid_val);
     }
 
-    // PID 检查
     if (!should_override && target_pid_val != 0 && current_pid == target_pid_val) {
         should_override = true;
         pr_debug("cpuinfo_hook: PID 匹配 %d\n", target_pid_val);
     }
 
-    // 如果满足条件，输出自定义 CPU 信息
     if (should_override) {
-        pr_info("cpuinfo_hook: 为 PID %d, UID %u 提供自定义 CPU 信息\n",
-                current_pid, current_kuid.val);
+        pr_info("cpuinfo_hook: 为 PID=%d UID=%u 提供自定义 CPU 信息\n", current_pid, uid);
         seq_printf(m, "%s", custom_cpuinfo_output);
         return 0;
     }
 
-    // 否则调用原始函数
-    if (original_cpuinfo_show) {
+    if (original_cpuinfo_show)
         return original_cpuinfo_show(m, v);
-    }
 
     seq_printf(m, "错误: 原始 cpuinfo show 函数不可用\n");
     return 0;
 }
 
-// 初始化和清理函数
-#ifdef CONFIG_ARM64
-static int init_arm64_symbols(void)
-{
-    pr_info("cpuinfo_hook: 在 ARM64 架构上运行，初始化所需符号\n");
-    
-    update_mapping_prot = (void (*)(phys_addr_t, unsigned long, phys_addr_t, pgprot_t))
-                         lookup_name("update_mapping_prot");
-    if (!update_mapping_prot) {
-        pr_err("cpuinfo_hook: 无法找到 update_mapping_prot 符号\n");
-        return -EINVAL;
-    }
-    
-    start_rodata = lookup_name("__start_rodata");
-    if (!start_rodata) {
-        pr_err("cpuinfo_hook: 无法找到 __start_rodata 符号\n");
-        return -EINVAL;
-    }
-    
-    init_begin = lookup_name("__init_begin");
-    if (!init_begin) {
-        pr_err("cpuinfo_hook: 无法找到 __init_begin 符号\n");
-        return -EINVAL;
-    }
-    
-    pr_info("cpuinfo_hook: ARM64 符号初始化完成 - start_rodata: 0x%lx, init_begin: 0x%lx\n", 
-            start_rodata, init_begin);
-            
-    return 0;
-}
-#endif
-
-// 模块初始化函数
-static int __init cpuinfo_hook_init(void)
+/****************** 安装/恢复钩子 ******************/
+static int install_hook(void)
 {
     unsigned long cpuinfo_op_addr;
-    
-    pr_info("cpuinfo_hook: 初始化 cpuinfo 钩子模块...\n");
-    pr_info("cpuinfo_hook: 目标 UID: %u, 目标 PID: %d\n", target_uid_val, target_pid_val);
-    
-    // 初始化平台特定的内存保护机制
-#ifdef CONFIG_X86_64
-    cr0 = read_cr0();
-    pr_info("cpuinfo_hook: 在 X86_64 架构上运行, CR0: 0x%lx\n", cr0);
-#elif defined(CONFIG_ARM64)
-    if (init_arm64_symbols() != 0) {
-        pr_err("cpuinfo_hook: ARM64 符号初始化失败\n");
-        return -EINVAL;
-    }
-#endif
-    
-    // 查找 cpuinfo_op 结构
+
+    /* 尝试解析 set_memory_*（若导出则优先使用） */
+    resolve_set_memory_symbols();
+
+    /* 查找 cpuinfo_op */
     cpuinfo_op_addr = lookup_name("cpuinfo_op");
     if (!cpuinfo_op_addr) {
         pr_err("cpuinfo_hook: 无法找到 cpuinfo_op 符号\n");
         return -EINVAL;
     }
-    
-    // 保存原始序列操作结构
+
     original_cpuinfo_op = (const struct seq_operations *)cpuinfo_op_addr;
     if (!original_cpuinfo_op) {
-        pr_err("cpuinfo_hook: cpuinfo_op 结构无效\n");
+        pr_err("cpuinfo_hook: cpuinfo_op 地址无效\n");
         return -EINVAL;
     }
-    
-    // 保存原始 show 函数并替换为我们的自定义函数
+
     original_cpuinfo_show = original_cpuinfo_op->show;
     if (!original_cpuinfo_show) {
         pr_err("cpuinfo_hook: 原始 show 函数为空\n");
         return -EINVAL;
     }
-    
-    pr_info("cpuinfo_hook: 原始 show 函数位于 0x%px\n", original_cpuinfo_show);
-    
-    // 修改函数指针
-#if defined(CONFIG_X86_64) || defined(CONFIG_ARM64)
-   unprotect_memory();
+
+    pr_info("cpuinfo_hook: 原始 show @ %px, cpuinfo_op @ %px\n",
+            original_cpuinfo_show, original_cpuinfo_op);
+
+    /* 改写前置：使页可写（优先 set_memory_*，否则回退方案） */
+    if (make_addr_rw_ro_runtime((unsigned long)original_cpuinfo_op, true) != 0) {
+        pr_err("cpuinfo_hook: 无法临时将 cpuinfo_op 所在区域设为可写\n");
+        return -EINVAL;
+    }
+
+    /* 真正修改指针 */
     ((struct seq_operations *)original_cpuinfo_op)->show = custom_show_cpuinfo;
-   protect_memory();
-#else
-    // 对于不支持的架构，我们直接修改指针
-    ((struct seq_operations *)original_cpuinfo_op)->show = custom_show_cpuinfo;
-#endif
-    
+
+    /* 改写后恢复只读（若是回退到 x86 的 CR0，这里会把 WP 恢复回去） */
+    if (make_addr_rw_ro_runtime((unsigned long)original_cpuinfo_op, false) != 0) {
+        pr_warn("cpuinfo_hook: 写回只读失败（非致命），注意内核页权限状态\n");
+    }
+
     pr_info("cpuinfo_hook: 钩子安装完成\n");
     return 0;
 }
 
-// 模块退出函数
-static void __exit cpuinfo_hook_exit(void)
+static void uninstall_hook(void)
 {
-    pr_info("cpuinfo_hook: 卸载模块...\n");
-    
-    // 恢复原始函数指针
+    pr_info("cpuinfo_hook: 卸载模块，恢复原始 show...\n");
+
     if (original_cpuinfo_op && original_cpuinfo_show) {
-        pr_info("cpuinfo_hook: 恢复原始 show 函数\n");
-        
-#if defined(CONFIG_X86_64) || defined(CONFIG_ARM64)
-        unprotect_memory();
+        /* 临时可写 */
+        if (make_addr_rw_ro_runtime((unsigned long)original_cpuinfo_op, true) != 0) {
+            pr_err("cpuinfo_hook: 设为可写失败，仍尝试恢复指针\n");
+        }
+
         ((struct seq_operations *)original_cpuinfo_op)->show = original_cpuinfo_show;
-        protect_memory();
-#else
-        ((struct seq_operations *)original_cpuinfo_op)->show = original_cpuinfo_show;
-#endif
+
+        /* 恢复只读 / 恢复 WP 或 ARM64 ro 段 */
+        if (make_addr_rw_ro_runtime((unsigned long)original_cpuinfo_op, false) != 0) {
+            pr_warn("cpuinfo_hook: 恢复只读失败，可能留下可写页\n");
+        }
     }
-    
-    // 清理资源
+
     original_cpuinfo_show = NULL;
     original_cpuinfo_op = NULL;
-    
-    // 清理特定架构资源
+
 #ifdef CONFIG_ARM64
-    update_mapping_prot = NULL;
+    update_mapping_prot_fp = NULL;
     start_rodata = 0;
     init_begin = 0;
 #endif
-    
-    pr_info("cpuinfo_hook: 模块已完全卸载\n");
+
+    pr_info("cpuinfo_hook: 恢复完成\n");
+}
+
+/****************** 模块入口/出口 ******************/
+static int __init cpuinfo_hook_init(void)
+{
+    pr_info("cpuinfo_hook: 初始化... 目标 UID=%u, 目标 PID=%d\n",
+            target_uid_val, target_pid_val);
+    return install_hook();
+}
+
+static void __exit cpuinfo_hook_exit(void)
+{
+    uninstall_hook();
 }
 
 module_init(cpuinfo_hook_init);
 module_exit(cpuinfo_hook_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
-MODULE_DESCRIPTION("动态 /proc/cpuinfo 钩子 (支持 x86_64, ARM64)");
+MODULE_AUTHOR("feicong");
+MODULE_DESCRIPTION("内核修改/proc/cpuinfo");
 MODULE_VERSION("1.0");
