@@ -105,6 +105,44 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-arm64",
             "configurationProvider": "mesonbuild.mesonbuild"
+        },
+        {
+            "name": "Android13 x86_64",
+            "includePath": [
+                "android13-5.15-*/common",
+                "android13-5.15-*/common/include",
+                "android13-5.15-*/common/include/uapi",
+                "android13-5.15-*/common/kernel",
+                "android13-5.15-*/common/arch/x86/include",
+                "android13-5.15-*/common/arch/x86/include/uapi",
+                "android13-5.15-*/bazel-android13-5.15-*/common/include",
+                "android13-5.15-*/bazel-android13-5.15-*/common/arch/x86/include",
+                "android13-5.15-*/bazel-android13-5.15-*/common/arch/x86/include/uapi",
+                "android13-5.15-*/bazel-android13-5.15-*/common/usr/include",
+                "android13-5.15-*/out/cache/__common_kernel_x86_64/include",
+                "android13-5.15-*/out/cache/__common_kernel_x86_64/usr/include/",
+                "android13-5.15-*/out/cache/__common_kernel_x86_64/include/generated/uapi",
+                "android13-5.15-*/out/cache/__common_kernel_x86_64/arch/x86/include/generated",
+                "android13-5.15-*/out/cache/__common_kernel_x86_64/arch/x86/include/generated/uapi"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "__ANDROID_COMMON_KERNEL__",
+                "MODULE"
+            ],
+            "compilerArgs": [
+                "-nostdinc",
+                "-include",
+                "android13-5.15-*/common/include/linux/kconfig.h",
+                "-include",
+                "android13-5.15-*/common/include/linux/compiler_types.h",
+                "-Wno-declaration-after-statement"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "mesonbuild.mesonbuild"
         }
     ],
     "version": 4
