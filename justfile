@@ -555,15 +555,16 @@ clean-mod:
     #!/bin/bash
     set -e
     echo "正在清理模块..."
-    cd modules/hello
-    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
-    cd ../cpuinfo
-    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
-    cd ../kprobe
-    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
-    cd ../ftrace
-    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
-    cd ../..
+    for dir in hello cpuinfo kprobe ftrace; do
+        if [ -d "modules/$dir" ]; then
+            echo "清理 $dir 模块..."
+            cd modules/$dir
+            make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+            cd ../..
+        else
+            echo "$dir 模块目录不存在，跳过。"
+        fi
+    done
     echo "模块清理完成。"
 
 # 编译 hello 内核模块
