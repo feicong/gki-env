@@ -1,5 +1,4 @@
 // Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/ebpf-course)
-#include <linux/init.h>
 #include <linux/module.h>
 
 static int __init hello_init(void) {
