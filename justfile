@@ -577,6 +577,26 @@ hello:
     make  KERNEL_SRC=/lib/modules/$(uname -r)/build
     echo "内核模块编译完成。"
 
+# 测试 hello 内核模块
+hello-test: hello
+    #!/bin/bash
+    set -e
+    echo "正在测试 hello 内核模块..."
+    cd modules/hello
+    sudo insmod hello.ko
+    if [ $? -ne 0 ]; then
+        echo "hello 内核模块加载失败，请检查日志。"
+        exit 1
+    fi
+    echo "hello 内核模块加载成功。"
+    sudo dmesg | tail -n 20
+    sudo rmmod hello
+    if [ $? -ne 0 ]; then
+        echo "hello 内核模块卸载失败，请检查日志。"
+        exit 1
+    fi
+    echo "hello 内核模块卸载成功。"
+
 # 编译 hello 内核模块（GKI x86_64）
 hello-gki-x86_64:
     #!/bin/bash
