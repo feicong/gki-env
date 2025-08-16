@@ -550,14 +550,30 @@ workspace:
     
     echo "WORKSPACE配置完成。"
 
+# 清理内核模块
+clean-mod:
+    #!/bin/bash
+    set -e
+    echo "正在清理模块..."
+    cd modules/hello
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    cd ../cpuinfo
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    cd ../kprobe
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    cd ../ftrace
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    cd ../..
+    echo "模块清理完成。"
+
 # 编译 hello 内核模块
 hello:
     #!/bin/bash
     set -e
     echo "正在编译内核模块..."
     cd modules/hello
-    make clean
-    make
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    make  KERNEL_SRC=/lib/modules/$(uname -r)/build
     echo "内核模块编译完成。"
 
 # 编译 hello 内核模块（GKI x86_64）
@@ -566,10 +582,24 @@ hello-gki-x86_64:
     set -e
     echo "正在编译GKI内核模块..."
     cd {{CONFIG}}
-    rm -rf ./common/hello
-    cp -r -f ../modules/hello ./common/hello
-    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //hello:hello
-    file bazel-bin/hello/hello/hello.ko
-    rm -rf ./common/hello
+    DIST_HELLO_DIR=./common/hello
+    rm -rf $DIST_HELLO_DIR
+    cp -r -f ../modules/hello $DIST_HELLO_DIR
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common/hello:hello
+    tree -f . | grep hello.ko
+    rm -rf $DIST_HELLO_DIR
     echo "内核模块编译完成。"
 
+# 编译 hello 内核模块（CVD x86_64）
+hello-cvd-x86_64:
+    #!/bin/bash
+    set -e
+    echo "正在编译CVD内核模块..."
+    cd {{CONFIG}}
+    DIST_HELLO_DIR=./common-modules/virtual-device/hello
+    rm -rf $DIST_HELLO_DIR
+    cp -r -f ../modules/hello $DIST_HELLO_DIR
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device:virtual_device_x86_64_dist
+    # tree -f . | grep hello.ko
+    rm -rf $DIST_HELLO_DIR
+    echo "内核模块编译完成。"

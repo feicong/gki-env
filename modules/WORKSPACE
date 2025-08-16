@@ -1,3 +1,0 @@
-# Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/ebpf-course)
-
-workspace(name = "external_modules")

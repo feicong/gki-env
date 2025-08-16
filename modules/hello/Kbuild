@@ -1,4 +1,1 @@
-
 obj-m += hello.o
-
-LINUXINCLUDE := -I$(srctree)/../common-modules/virtual-device/uapi ${LINUXINCLUDE}
