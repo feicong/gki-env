@@ -597,6 +597,33 @@ hello-test: hello
     fi
     echo "hello 内核模块卸载成功。"
 
+# 推送文件到安卓设备
+push file:
+    #!/bin/bash
+    set -e
+    adb push {{file}} /data/local/tmp/{{file}}
+
+# 测试 CVD hello 内核模块
+hello-cvd-test:
+    #!/bin/bash
+    set -e
+    echo "正在测试 CVD hello 内核模块..."
+    adb push {{CONFIG}}/bazel-bin/common-modules/virtual-device/hello/hello/hello.ko /data/local/tmp/hello.ko
+    adb shell "su 0 dmesg -c"
+    adb shell "su 0 insmod /data/local/tmp/hello.ko"
+    if [ $? -ne 0 ]; then
+        echo "CVD hello 内核模块加载失败，请检查日志。"
+        exit 1
+    fi
+    echo "CVD hello 内核模块加载成功。"
+    adb shell "su 0 dmesg -c | tail -n 50"
+    adb shell "su 0 rmmod /data/local/tmp/hello.ko"
+    if [ $? -ne 0 ]; then
+        echo "CVD hello 内核模块卸载失败，请检查日志。"
+    fi
+    adb shell "su 0 dmesg -c"
+    echo "CVD hello 内核模块卸载成功。"
+
 # 编译 hello 内核模块（GKI x86_64）
 hello-gki-x86_64:
     #!/bin/bash
