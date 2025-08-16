@@ -509,9 +509,16 @@ cpuinfo-android:
         OBJSIZE={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-size \
         NM=={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-nm
 
-# 构建 diamorphine Rootkit模块
-diamorphine:
+# 构建kprobe模块
+kprobe:
     #!/bin/bash
-    @echo "正在编译 diamorphine 模块..."
-    cd modules/diamorphine && make clean && make
-    echo "diamorphine 模块编译完成。"
+    @echo "正在编译 kprobe 模块..."
+    cd modules/kprobe && make clean && make
+    echo "kprobe 模块编译完成。"
+
+# 构建ftrace模块
+ftrace:
+    #!/bin/bash
+    @echo "正在编译 ftrace 模块..."
+    cd modules/ftrace && make clean && make
+    echo "ftrace 模块编译完成。"

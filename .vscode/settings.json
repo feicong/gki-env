@@ -8,8 +8,6 @@
         "chrono": "c",
         "map": "c",
         "set": "c",
-        "unordered_map": "c",
-        "unordered_set": "c"
     },
     "files.exclude": {
         "**/*.d": true,
