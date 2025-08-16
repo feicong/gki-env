@@ -14,7 +14,7 @@
 #include <linux/errno.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("feicong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("使用 ftrace hook /proc/cpuinfo");
 
 /* 模块参数 */
@@ -121,13 +121,24 @@ static int custom_show_cpuinfo(struct seq_file *m, void *v)
     return 0;
 }
 
-/* ---------- ftrace hooking 部分 ---------- */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,11,0)
+#define FTRACE_OPS_FL_RECURSION FTRACE_OPS_FL_RECURSION_SAFE
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,11,0)
+#define ftrace_regs pt_regs
+static __always_inline struct pt_regs *ftrace_get_regs(struct ftrace_regs *fregs)
+{
+	return fregs;
+}
+#endif
 
 /* 兼容性：有些内核没有 FTRACE_OPS_FL_RECURSION_SAFE，做下兼容定义 */
-#ifndef FTRACE_OPS_FL_RECURSION_SAFE
-#define CPUINFO_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION)
+#ifdef CONFIG_ARM64
+#define CPUINFO_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION_SAFE | FTRACE_OPS_FL_IPMODIFY)
 #else
-#define CPUINFO_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION_SAFE)
+#define CPUINFO_FTRACE_FLAGS (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY)
 #endif
 
 /* ftrace 回调（thunk） */
@@ -135,8 +146,11 @@ static void notrace ftrace_hook_thunk(unsigned long ip, unsigned long parent_ip,
                                       struct ftrace_ops *ops, struct ftrace_regs *fregs)
 {
     struct pt_regs *regs = ftrace_get_regs(fregs);
-    /* 将 RIP 指向 custom_show_cpuinfo */
-    regs->ip = (unsigned long)custom_show_cpuinfo;
+#ifdef CONFIG_ARM64
+	regs->pc = (unsigned long)custom_show_cpuinfo;
+#else
+	regs->ip = (unsigned long)custom_show_cpuinfo;
+#endif
 }
 
 /* ftrace ops - 注意 flags 使用上面的兼容宏 */
