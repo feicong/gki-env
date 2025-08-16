@@ -331,6 +331,15 @@ configure:
     for config in "${BBR_CONFIGS[@]}"; do
         echo "$config" >> ${GKI_DEFCONFIG_ARM64}
     done
+
+    # 为内核添加 FTRACE 配置
+    FTRACE_CONFIGS=(
+        "CONFIG_FUNCTION_TRACER=y"
+        "CONFIG_FUNCTION_GRAPH_TRACER=y"
+        "CONFIG_STACK_TRACER=y"
+        "CONFIG_DYNAMIC_FTRACE=y"
+        "CONFIG_FTRACE_SYSCALLS=y"
+    )
     
     # 移除 check_defconfig
     sed -i 's/check_defconfig//' ./common/build.config.gki
