@@ -604,3 +604,18 @@ hello-cvd-x86_64:
     # tree -f . | grep hello.ko
     rm -rf $DIST_HELLO_DIR
     echo "内核模块编译完成。"
+
+# 编译 hello 内核模块（CVD x86_64）
+hello-cvd-x86_642:
+    #!/bin/bash
+    set -e
+    echo "正在编译CVD内核模块..."
+    cd {{CONFIG}}
+    DIST_HELLO_DIR=./common-modules/virtual-device/hello
+    rm -rf $DIST_HELLO_DIR
+    cp -r -f ../modules/hello $DIST_HELLO_DIR
+    mv -f $DIST_HELLO_DIR/BUILD.cf.bazel $DIST_HELLO_DIR/BUILD.bazel
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device/hello:hello
+    # tree -f . | grep hello.ko
+    rm -rf $DIST_HELLO_DIR
+    echo "内核模块编译完成。"
