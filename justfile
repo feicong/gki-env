@@ -574,7 +574,7 @@ hello:
     echo "正在编译内核模块..."
     cd modules/hello
     make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
-    make  KERNEL_SRC=/lib/modules/$(uname -r)/build
+    make KERNEL_SRC=/lib/modules/$(uname -r)/build
     echo "内核模块编译完成。"
 
 # 测试 hello 内核模块
