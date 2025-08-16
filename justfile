@@ -531,3 +531,40 @@ ftrace:
     @echo "正在编译 ftrace 模块..."
     cd modules/ftrace && make clean && make
     echo "ftrace 模块编译完成。"
+
+workspace:
+    #!/bin/bash
+    set -e
+    echo "正在配置内核..."
+    cd {{CONFIG}}
+    # 判断当前目录的WORKSPACE文件是否有modules目录的引入，没有就添加
+    if ! grep -q "local_repository(" WORKSPACE; then
+        echo "" >> WORKSPACE
+        echo "local_repository(" >> WORKSPACE
+        echo "    name = \"external_modules\"," >> WORKSPACE
+        echo "    path = \"../modules\"," >> WORKSPACE
+        echo ")" >> WORKSPACE
+    else
+        echo "WORKSPACE文件已包含modules目录的引入，跳过。"
+    fi
+    
+    echo "WORKSPACE配置完成。"
+
+hello:
+    #!/bin/bash
+    set -e
+    echo "正在编译内核模块..."
+    cd modules/hello
+    make clean
+    make
+    echo "内核模块编译完成。"
+
+hello-cvd-x86_64:
+    #!/bin/bash
+    set -e
+    echo "正在编译内核模块..."
+    cd {{CONFIG}}
+    rm -rf ./common-modules/virtual-device/hello
+    cp -r -f ../modules/hello ./common-modules/virtual-device/hello
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device:virtual_device_x86_64_dist
+    echo "内核模块编译完成。"
