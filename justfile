@@ -550,6 +550,7 @@ workspace:
     
     echo "WORKSPACE配置完成。"
 
+# 编译 hello 内核模块
 hello:
     #!/bin/bash
     set -e
@@ -559,12 +560,16 @@ hello:
     make
     echo "内核模块编译完成。"
 
-hello-cvd-x86_64:
+# 编译 hello 内核模块（GKI x86_64）
+hello-gki-x86_64:
     #!/bin/bash
     set -e
-    echo "正在编译内核模块..."
+    echo "正在编译GKI内核模块..."
     cd {{CONFIG}}
-    rm -rf ./common-modules/virtual-device/hello
-    cp -r -f ../modules/hello ./common-modules/virtual-device/hello
-    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device:virtual_device_x86_64_dist
+    rm -rf ./common/hello
+    cp -r -f ../modules/hello ./common/hello
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //hello:hello
+    file bazel-bin/hello/hello/hello.ko
+    rm -rf ./common/hello
     echo "内核模块编译完成。"
+

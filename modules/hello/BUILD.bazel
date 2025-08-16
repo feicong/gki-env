@@ -23,12 +23,12 @@ kernel_module (
     outs = [
         "hello.ko",
     ],
-    kernel_build = "//common-modules/virtual-device/:virtual_device_x86_64",
+    kernel_build = "//common:kernel_x86_64",
 )
 
 kernel_modules_install(
     name = "hello_install",
-    kernel_build = "//common-modules/virtual-device/:virtual_device_x86_64",
+    kernel_build = "//common:kernel_x86_64",
     kernel_modules = [
         ":hello",
     ],
