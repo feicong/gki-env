@@ -8,7 +8,7 @@ MODULE_AUTHOR("feicong");
 MODULE_DESCRIPTION("Create /proc/fake_cpuinfo with custom content");
 MODULE_VERSION("0.1");
 
-#define PROC_NAME "fake_cpuinfo"
+#define PROC_NAME "proccpuinfo"
 
 static int fake_cpuinfo_show(struct seq_file *m, void *v)
 {
