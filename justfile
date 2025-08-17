@@ -689,3 +689,15 @@ fake-meminfo:
         umount /proc/meminfo
     '
     echo "/proc/meminfo 模拟完成。"
+
+list-mod:
+    #!/bin/bash
+    set -e
+    echo "正在列出可用的内核模块..."
+    for dir in modules/*; do
+        if [ -d "$dir" ]; then
+            modname=$(basename "$dir")
+            echo "$modname"
+        fi
+    done
+    echo "可用内核模块列表已显示。"
