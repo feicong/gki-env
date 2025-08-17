@@ -29,6 +29,6 @@ rmmod:
 
 test:
 	@cc mountcpuinfo.c -o mountcpuinfo
-	sudo ./mountcpuinfo /proc/proccpuinfo "/bin/cat /proc/cpuinfo"
+	@sudo ./mountcpuinfo /proc/proccpuinfo "/bin/cat /proc/cpuinfo"
 	@sudo umount /proc/cpuinfo
 	@rm -f mountcpuinfo
