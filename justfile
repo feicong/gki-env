@@ -691,6 +691,7 @@ fake-meminfo:
     '
     echo "/proc/meminfo 模拟完成。"
 
+# 列出可用的内核模块
 list-mod:
     #!/bin/bash
     set -e
