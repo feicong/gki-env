@@ -621,7 +621,6 @@ hello-cvd-x86_642:
     cp -r -f ../modules/hello $DIST_HELLO_DIR
     mv -f $DIST_HELLO_DIR/BUILD.cf.bazel $DIST_HELLO_DIR/BUILD.bazel
     tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device/hello:hello
-    # tree -f . | grep hello.ko
     rm -rf $DIST_HELLO_DIR
     echo "内核模块编译完成。"
 
@@ -682,6 +681,20 @@ list-mod:
         fi
     done
     echo "可用内核模块列表已显示。"
+
+# 编译安卓CVD内核模块
+cook-cvd-mod modname:
+    #!/bin/bash
+    set -e
+    echo "正在编译安卓CVD内核模块 {{modname}}..."
+    cd {{CONFIG}}
+    DIST_MOD_DIR=./common-modules/virtual-device/{{modname}}
+    rm -rf $DIST_MOD_DIR
+    cp -r -f ../modules/{{modname}} $DIST_MOD_DIR
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast //common-modules/virtual-device/{{modname}}:{{modname}}
+    tree -f . | grep {{modname}}.ko
+    rm -rf $DIST_MOD_DIR
+    echo "安卓CVD内核模块 {{modname}} 编译完成。"
 
 # 测试安卓CVD内核模块
 test-cvd-mod modname:
