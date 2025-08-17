@@ -667,6 +667,7 @@ hello-cvd-x86_642:
     rm -rf $DIST_HELLO_DIR
     echo "内核模块编译完成。"
 
+# 编译指定的内核模块
 cook-mod modname:
     #!/bin/bash
     set -e
@@ -699,3 +700,15 @@ test-mod modname:
         exit 1
     fi
     echo "{{modname}} 内核模块卸载成功。"
+
+# 模拟 /proc/meminfo
+fake-meminfo:
+    #!/bin/bash
+    set -e
+    sudo unshare -m bash -c '
+        mount --make-rprivate /etc/apt/sources.list.d/ubuntu.sources
+        mount --bind /etc/apt/sources.list.d/ubuntu.sources /proc/meminfo
+        exec cat /proc/meminfo
+        umount /proc/meminfo
+    '
+    echo "/proc/meminfo 模拟完成。"
