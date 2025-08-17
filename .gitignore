@@ -32,3 +32,4 @@ kernel_patches
 bootimgs/
 .env
 *.usyms
+mountcpuinfo

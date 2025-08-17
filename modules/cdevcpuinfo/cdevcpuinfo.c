@@ -4,11 +4,12 @@
 #include <linux/uaccess.h>
 #include <linux/cdev.h>
 #include <linux/version.h>
+#include <linux/device.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("feicong");
 MODULE_DESCRIPTION("Create /dev/fake_cpuinfo with custom content using chrdev");
-MODULE_VERSION("0.2");
+MODULE_VERSION("0.3");
 
 #define DEVICE_NAME "cdevcpuinfo"
 #define CLASS_NAME  "fakecpu"
@@ -16,6 +17,13 @@ MODULE_VERSION("0.2");
 static dev_t dev_number;
 static struct class *fakecpu_class = NULL;
 static struct cdev fakecpu_cdev;
+
+static char *fakecpu_devnode(const struct device *dev, short unsigned int *mode)
+{
+	if (mode)
+		*mode = 0444; // r--r--r--
+	return NULL;
+}
 
 static const char fake_cpuinfo_data[] =
     "Processor\t: Fake ARMv8 Processor rev 4 (v8l)\n"
@@ -28,10 +36,8 @@ static const char fake_cpuinfo_data[] =
 
 // ---------- 兼容宏 ----------
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
-// 新内核 (>=6.4) class_create 只需要一个参数
 #define CLASS_CREATE(owner, name) class_create(name)
 #else
-// 旧内核 (<6.4) class_create 需要 THIS_MODULE
 #define CLASS_CREATE(owner, name) class_create(owner, name)
 #endif
 // ---------------------------
@@ -103,8 +109,9 @@ static int __init fakecpu_init(void)
         pr_err("failed to create class\n");
         return PTR_ERR(fakecpu_class);
     }
+    fakecpu_class->devnode = fakecpu_devnode;
 
-    // 创建设备节点 /dev/fake_cpuinfo
+    // 创建设备节点 /dev/cdevcpuinfo
     if (IS_ERR(device_create(fakecpu_class, NULL, dev_number, NULL, DEVICE_NAME))) {
         class_destroy(fakecpu_class);
         cdev_del(&fakecpu_cdev);
