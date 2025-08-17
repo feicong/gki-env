@@ -1,6 +1,5 @@
 // Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
 #include <linux/module.h>
-// #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
