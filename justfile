@@ -555,7 +555,7 @@ clean-mod:
     #!/bin/bash
     set -e
     echo "正在清理模块..."
-    for dir in hello cpuinfo kprobe ftrace; do
+    for dir in hello proccpuinfo cpuinfo kprobe ftrace; do
         if [ -d "modules/$dir" ]; then
             echo "清理 $dir 模块..."
             cd modules/$dir
@@ -666,3 +666,36 @@ hello-cvd-x86_642:
     # tree -f . | grep hello.ko
     rm -rf $DIST_HELLO_DIR
     echo "内核模块编译完成。"
+
+cook-mod modname:
+    #!/bin/bash
+    set -e
+    echo "正在编译 {{modname}} 内核模块..."
+    cd modules/{{modname}}
+    make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
+    make KERNEL_SRC=/lib/modules/$(uname -r)/build
+    echo "内核模块 {{modname}} 编译完成。"
+
+# 测试内核模块
+test-mod modname:
+    #!/bin/bash
+    set -e
+    echo "正在测试 {{modname}} 内核模块..."
+    cd modules/{{modname}}
+    make insmod KERNEL_SRC=/lib/modules/$(uname -r)/build
+    if [ $? -ne 0 ]; then
+        echo "{{modname}} 内核模块加载失败，请检查日志。"
+        exit 1
+    fi
+    echo "{{modname}} 内核模块加载成功。"
+    make test KERNEL_SRC=/lib/modules/$(uname -r)/build
+    if [ $? -ne 0 ]; then
+        echo "{{modname}} 内核模块测试失败，请检查日志。"
+    fi
+    echo "测试成功"
+    make rmmod KERNEL_SRC=/lib/modules/$(uname -r)/build
+    if [ $? -ne 0 ]; then
+        echo "{{modname}} 内核模块卸载失败，请检查日志。"
+        exit 1
+    fi
+    echo "{{modname}} 内核模块卸载成功。"
