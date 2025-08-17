@@ -29,5 +29,6 @@ rmmod:
 
 test:
 	@cc mountcpuinfo.c -o mountcpuinfo
-	sudo ./mountcpuinfo /dev/fake_cpuinfo "/bin/cat /proc/cpuinfo"
+	@sudo ./mountcpuinfo /dev/cdevcpuinfo "/bin/cat /proc/cpuinfo"
+	@sudo umount /proc/cpuinfo
 	@rm -f mountcpuinfo
