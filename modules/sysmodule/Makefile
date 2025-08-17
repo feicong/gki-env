@@ -37,8 +37,8 @@ test:
 	@cat /proc/sys/kernel/kptr_restrict
 	@cat /sys/kernel/sysmodule/status
 	@tail -10 /proc/kallsyms
-	@echo "查看 sysmodule/status 为 0"
-	sudo bash -c "echo 0 > /sys/kernel/sysmodule/status"
+	@echo "设置 sysmodule/status 为 0"
+	@sudo sysctl -w kernel.sysmodule.status=0
 	@cat /proc/sys/kernel/kptr_restrict
 	@cat /sys/kernel/sysmodule/status
 	@sudo systemd-run -t --property=AmbientCapabilities=CAP_SYSLOG /bin/bash -c "tail -10 /proc/kallsyms"
