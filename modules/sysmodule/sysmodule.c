@@ -1,11 +1,8 @@
 // Copyright (C) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/kobject.h>
 #include <linux/sysfs.h>
-#include <linux/security.h> // Required for security_getenforce/setenforce
 #include <linux/kprobes.h>
 
 static struct kobject *sysmodule_kobj;
