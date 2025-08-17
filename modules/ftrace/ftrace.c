@@ -294,6 +294,8 @@ static asmlinkage long fh_sys_getdents64(struct pt_regs *regs)
 #  define SYSCALL_NAME(name) ("__arm64_" name)
 # elif defined(CONFIG_X86_64)
 #  define SYSCALL_NAME(name) ("__x64_" name)
+# else
+# error "未支持的架构"
 # endif
 
 /* Hook 定义宏 */
