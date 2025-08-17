@@ -488,28 +488,7 @@ cook-gki: setup download-gki build-gki create-bootimg create-anykernel
     @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo ""
 
-# 构建 cpuinfo 模块（Android 版本）
-cpuinfo-android:
-    #!/bin/bash
-    export ARCH=arm64
-    export SUBARCH=arm64
-    export CROSS_COMPILE=arm64-linux-android-
-    export PATH={{CONFIG}}/build/kernel/build-tools/path/linux-x86:{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin:{{CONFIG}}/out/android13-5.15/common/host_tools:$PATH
-    export KERNEL_SRC={{WORKSPACE}}/{{CONFIG}}/out/android13-5.15/common
-    export CLANG_VERSION=r450784e
-    export LC_ADDRESS=zh_CN.UTF-8
-    export LC_NAME=zh_CN.UTF-8
-    export LTO=thin
-    export LANG=en_US.UTF-8
-    export KCFLAGS=-D__ANDROID_COMMON_KERNEL__
-    export LLVM=1
-    cd modules/cpuinfo
-    make clean
-    make CC={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/clang \
-        LD={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/ld.lld \
-        OBJSIZE={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-size \
-        NM=={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-nm
-
+# 配置 WORKSPACE 文件
 workspace:
     #!/bin/bash
     set -e
