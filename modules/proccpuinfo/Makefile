@@ -19,13 +19,15 @@ modules modules_install clean:
 endif
 
 insmod:
-	sudo dmesg -c
-	sudo insmod proccpuinfo.ko
-	sudo dmesg | tail -n 20
+	@sudo dmesg -c
+	@sudo insmod proccpuinfo.ko
+	@sudo dmesg | tail -n 20
 
 rmmod:
-	sudo rmmod proccpuinfo.ko
-	sudo dmesg -c
+	@sudo rmmod proccpuinfo.ko
+	@sudo dmesg -c
 
 test:
-	cat /proc/fake_cpuinfo
+	@cc mountcpuinfo.c -o mountcpuinfo
+	sudo ./mountcpuinfo /proc/fake_cpuinfo "/bin/cat /proc/cpuinfo"
+	@rm -f mountcpuinfo

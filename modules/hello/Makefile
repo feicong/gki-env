@@ -19,12 +19,12 @@ modules modules_install clean:
 endif
 
 insmod:
-	sudo dmesg -c
-	sudo insmod hello.ko
+	@sudo dmesg -c
+	@sudo insmod hello.ko
 
 rmmod:
-	sudo rmmod hello.ko
-	sudo dmesg -c
+	@sudo rmmod hello.ko
+	@sudo dmesg -c
 
 test:
-	sudo dmesg -c
+	@sudo dmesg -c
