@@ -555,7 +555,7 @@ clean-mod:
     #!/bin/bash
     set -e
     echo "正在清理模块..."
-    for dir in hello proccpuinfo cpuinfo kprobe ftrace; do
+    for dir in hello proccpuinfo cdevcpuinfo cpuinfo kprobe ftrace; do
         if [ -d "modules/$dir" ]; then
             echo "清理 $dir 模块..."
             cd modules/$dir

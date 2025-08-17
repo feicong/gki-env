@@ -1,0 +1,131 @@
+// Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/cdev.h>
+#include <linux/version.h>
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("feicong");
+MODULE_DESCRIPTION("Create /dev/fake_cpuinfo with custom content using chrdev");
+MODULE_VERSION("0.2");
+
+#define DEVICE_NAME "cdevcpuinfo"
+#define CLASS_NAME  "fakecpu"
+
+static dev_t dev_number;
+static struct class *fakecpu_class = NULL;
+static struct cdev fakecpu_cdev;
+
+static const char fake_cpuinfo_data[] =
+    "Processor\t: Fake ARMv8 Processor rev 4 (v8l)\n"
+    "Hardware\t: Custom Board\n"
+    "CPU implementer\t: 0x41\n"
+    "CPU architecture: 8\n"
+    "CPU variant\t: 0x0\n"
+    "CPU part\t: 0xd03\n"
+    "CPU revision\t: 4\n";
+
+// ---------- 兼容宏 ----------
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
+// 新内核 (>=6.4) class_create 只需要一个参数
+#define CLASS_CREATE(owner, name) class_create(name)
+#else
+// 旧内核 (<6.4) class_create 需要 THIS_MODULE
+#define CLASS_CREATE(owner, name) class_create(owner, name)
+#endif
+// ---------------------------
+
+static ssize_t fakecpu_read(struct file *filep, char __user *buf,
+                            size_t len, loff_t *offset)
+{
+    size_t datalen = strlen(fake_cpuinfo_data);
+
+    if (*offset >= datalen)
+        return 0;
+
+    if (len > datalen - *offset)
+        len = datalen - *offset;
+
+    if (copy_to_user(buf, fake_cpuinfo_data + *offset, len))
+        return -EFAULT;
+
+    *offset += len;
+    return len;
+}
+
+static int fakecpu_open(struct inode *inodep, struct file *filep)
+{
+    pr_info("fake_cpuinfo: device opened\n");
+    return 0;
+}
+
+static int fakecpu_release(struct inode *inodep, struct file *filep)
+{
+    pr_info("fake_cpuinfo: device closed\n");
+    return 0;
+}
+
+static struct file_operations fops = {
+    .owner   = THIS_MODULE,
+    .open    = fakecpu_open,
+    .read    = fakecpu_read,
+    .release = fakecpu_release,
+};
+
+static int __init fakecpu_init(void)
+{
+    int ret;
+
+    // 分配设备号
+    ret = alloc_chrdev_region(&dev_number, 0, 1, DEVICE_NAME);
+    if (ret < 0) {
+        pr_err("failed to allocate chrdev region\n");
+        return ret;
+    }
+
+    // 创建 cdev
+    cdev_init(&fakecpu_cdev, &fops);
+    fakecpu_cdev.owner = THIS_MODULE;
+
+    ret = cdev_add(&fakecpu_cdev, dev_number, 1);
+    if (ret < 0) {
+        unregister_chrdev_region(dev_number, 1);
+        pr_err("failed to add cdev\n");
+        return ret;
+    }
+
+    // 创建设备类（兼容不同内核版本）
+    fakecpu_class = CLASS_CREATE(THIS_MODULE, CLASS_NAME);
+    if (IS_ERR(fakecpu_class)) {
+        cdev_del(&fakecpu_cdev);
+        unregister_chrdev_region(dev_number, 1);
+        pr_err("failed to create class\n");
+        return PTR_ERR(fakecpu_class);
+    }
+
+    // 创建设备节点 /dev/fake_cpuinfo
+    if (IS_ERR(device_create(fakecpu_class, NULL, dev_number, NULL, DEVICE_NAME))) {
+        class_destroy(fakecpu_class);
+        cdev_del(&fakecpu_cdev);
+        unregister_chrdev_region(dev_number, 1);
+        pr_err("failed to create device\n");
+        return -1;
+    }
+
+    pr_info("/dev/%s created successfully\n", DEVICE_NAME);
+    return 0;
+}
+
+static void __exit fakecpu_exit(void)
+{
+    device_destroy(fakecpu_class, dev_number);
+    class_destroy(fakecpu_class);
+    cdev_del(&fakecpu_cdev);
+    unregister_chrdev_region(dev_number, 1);
+
+    pr_info("/dev/%s removed\n", DEVICE_NAME);
+}
+
+module_init(fakecpu_init);
+module_exit(fakecpu_exit);
