@@ -684,7 +684,6 @@ fake-meminfo:
     #!/bin/bash
     set -e
     sudo unshare -m bash -c '
-        mount --make-rprivate /etc/apt/sources.list.d/ubuntu.sources
         mount --bind /etc/apt/sources.list.d/ubuntu.sources /proc/meminfo
         exec cat /proc/meminfo
         umount /proc/meminfo
