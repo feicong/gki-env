@@ -488,14 +488,6 @@ cook-gki: setup download-gki build-gki create-bootimg create-anykernel
     @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo ""
 
-# 构建 cpuinfo 模块
-cpuinfo:
-    #!/bin/bash
-    @echo "正在编译 cpuinfo 模块..."
-    @head -30 /proc/cpuinfo
-    cd modules/cpuinfo && make clean && make
-    echo "cpuinfo 模块编译完成。"
-
 # 构建 cpuinfo 模块（Android 版本）
 cpuinfo-android:
     #!/bin/bash
@@ -517,20 +509,6 @@ cpuinfo-android:
         LD={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/ld.lld \
         OBJSIZE={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-size \
         NM=={{WORKSPACE}}/{{CONFIG}}/prebuilts/clang/host/linux-x86/clang-r450784e/bin/llvm-nm
-
-# 构建kprobe模块
-kprobe:
-    #!/bin/bash
-    @echo "正在编译 kprobe 模块..."
-    cd modules/kprobe && make clean && make
-    echo "kprobe 模块编译完成。"
-
-# 构建ftrace模块
-ftrace:
-    #!/bin/bash
-    @echo "正在编译 ftrace 模块..."
-    cd modules/ftrace && make clean && make
-    echo "ftrace 模块编译完成。"
 
 workspace:
     #!/bin/bash
