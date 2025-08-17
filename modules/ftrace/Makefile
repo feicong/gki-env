@@ -11,7 +11,13 @@ clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
 insmod:
+	@sudo dmesg -c
 	sudo insmod ftrace.ko
 
 rmmod:
 	sudo rmmod ftrace.ko
+	@sudo dmesg -c
+
+test:
+	@ls
+	@sudo dmesg -c
