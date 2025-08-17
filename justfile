@@ -533,10 +533,11 @@ clean-mod:
     #!/bin/bash
     set -e
     echo "正在清理模块..."
-    for dir in hello proccpuinfo cdevcpuinfo cpuinfo kprobe ftrace; do
-        if [ -d "modules/$dir" ]; then
+    for dir in modules/*; do
+        if [ -d "$dir" ]; then
+            modname=$(basename "$dir")
             echo "清理 $dir 模块..."
-            cd modules/$dir
+            cd $dir
             make clean KERNEL_SRC=/lib/modules/$(uname -r)/build
             cd ../..
         else
