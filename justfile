@@ -682,3 +682,25 @@ list-mod:
         fi
     done
     echo "可用内核模块列表已显示。"
+
+# 测试安卓CVD内核模块
+test-cvd-mod modname:
+    #!/bin/bash
+    set -e
+    echo "正在测试安卓内核模块 {{modname}}..."
+    adb push {{CONFIG}}/bazel-bin/common-modules/virtual-device/{{modname}}/{{modname}}.ko /data/local/tmp/{{modname}}.ko
+    adb shell "su 0 dmesg -c"
+    adb shell "su 0 insmod /data/local/tmp/{{modname}}.ko"
+    if [ $? -ne 0 ]; then
+        echo "{{modname}} 内核模块加载失败，请检查日志。"
+        exit 1
+    fi
+    echo "{{modname}} 内核模块加载成功。"
+    adb shell "su 0 dmesg -c | tail -n 50"
+    adb shell "su 0 rmmod /data/local/tmp/{{modname}}.ko"
+    if [ $? -ne 0 ]; then
+        echo "{{modname}} 内核模块卸载失败，请检查日志。"
+        exit 1
+    fi
+    adb shell "su 0 dmesg -c"
+    echo "{{modname}} 内核模块卸载成功。"
