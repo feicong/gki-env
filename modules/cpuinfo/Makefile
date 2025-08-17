@@ -19,8 +19,13 @@ modules modules_install clean:
 endif
 
 insmod:
-	sudo insmod cpuinfo.ko
+	@sudo dmesg -c
+	@sudo insmod cpuinfo.ko
 
 rmmod:
-	sudo rmmod cpuinfo.ko
+	@sudo rmmod cpuinfo.ko
+	@sudo dmesg -c
 
+test:
+	@cat /proc/cpuinfo
+	@sudo dmesg -c
