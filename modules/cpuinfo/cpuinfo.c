@@ -13,6 +13,15 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 
+/* ftrace 函数指针 */
+typedef int (*ftrace_set_filter_ip_t)(struct ftrace_ops *ops, unsigned long ip, int remove, int reset);
+typedef int (*register_ftrace_function_t)(struct ftrace_ops *ops);
+typedef int (*unregister_ftrace_function_t)(struct ftrace_ops *ops);
+
+static ftrace_set_filter_ip_t ftrace_set_filter_ip_p = NULL;
+static register_ftrace_function_t register_ftrace_function_p = NULL;
+static unregister_ftrace_function_t unregister_ftrace_function_p = NULL;
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("使用 ftrace hook /proc/cpuinfo");
@@ -159,6 +168,31 @@ static struct ftrace_ops cpuinfo_fops = {
     .flags = CPUINFO_FTRACE_FLAGS,
 };
 
+/* 解析 ftrace 函数地址 */
+static int resolve_ftrace_symbols(void)
+{
+    ftrace_set_filter_ip_p = (ftrace_set_filter_ip_t)lookup_name("ftrace_set_filter_ip");
+    if (!ftrace_set_filter_ip_p) {
+        pr_err("cpuinfo_ftrace: 无法解析 ftrace_set_filter_ip\n");
+        return -ENOENT;
+    }
+
+    register_ftrace_function_p = (register_ftrace_function_t)lookup_name("register_ftrace_function");
+    if (!register_ftrace_function_p) {
+        pr_err("cpuinfo_ftrace: 无法解析 register_ftrace_function\n");
+        return -ENOENT;
+    }
+
+    unregister_ftrace_function_p = (unregister_ftrace_function_t)lookup_name("unregister_ftrace_function");
+    if (!unregister_ftrace_function_p) {
+        pr_err("cpuinfo_ftrace: 无法解析 unregister_ftrace_function\n");
+        return -ENOENT;
+    }
+
+    pr_info("cpuinfo_ftrace: 所有 ftrace 函数地址解析成功\n");
+    return 0;
+}
+
 /* 注册 ftrace 过滤器到指定地址 */
 static int ftrace_install_hook(unsigned long func_addr)
 {
@@ -170,18 +204,18 @@ static int ftrace_install_hook(unsigned long func_addr)
         return -EINVAL;
     }
 
-    err = ftrace_set_filter_ip(&cpuinfo_fops, func_addr, 0, 0);
+    err = ftrace_set_filter_ip_p(&cpuinfo_fops, func_addr, 0, 0);
     if (err)
     {
         pr_err("cpuinfo_ftrace: ftrace_set_filter_ip 失败 err=%d\n", err);
         return err;
     }
 
-    err = register_ftrace_function(&cpuinfo_fops);
+    err = register_ftrace_function_p(&cpuinfo_fops);
     if (err)
     {
         pr_err("cpuinfo_ftrace: register_ftrace_function 失败 err=%d\n", err);
-        ftrace_set_filter_ip(&cpuinfo_fops, func_addr, 1, 0); /* undo filter */
+        ftrace_set_filter_ip_p(&cpuinfo_fops, func_addr, 1, 0); /* undo filter */
         return err;
     }
 
@@ -191,8 +225,8 @@ static int ftrace_install_hook(unsigned long func_addr)
 
 static void ftrace_remove_hook(unsigned long func_addr)
 {
-    unregister_ftrace_function(&cpuinfo_fops);
-    ftrace_set_filter_ip(&cpuinfo_fops, func_addr, 1, 0);
+    unregister_ftrace_function_p(&cpuinfo_fops);
+    ftrace_set_filter_ip_p(&cpuinfo_fops, func_addr, 1, 0);
     pr_info("cpuinfo_ftrace: 已移除 ftrace hook @ %px\n", (void *)func_addr);
 }
 
@@ -238,6 +272,12 @@ static void uninstall_ftrace_cpuinfo_hook(void)
 static int __init cpuinfo_ftrace_init(void)
 {
     pr_info("cpuinfo_ftrace: 初始化 (target_uid=%u, target_pid=%d)\n", target_uid_val, target_pid_val);
+
+    if (resolve_ftrace_symbols() != 0)
+    {
+        pr_err("cpuinfo_ftrace: 解析 ftrace symbols 失败\n");
+        return -EINVAL;
+    }
 
     if (install_ftrace_cpuinfo_hook() != 0)
     {
