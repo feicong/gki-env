@@ -12,19 +12,40 @@
 #include <linux/uaccess.h>
 #include <linux/namei.h>
 #include <linux/elf.h>
+#include <linux/cred.h>
 
-#if defined(CONFIG_X86_64)
-#define TARGET_PATH "/lib/x86_64-linux-gnu/libc.so.6"
-#elif defined(CONFIG_ARM64)
-#define TARGET_PATH "/lib/aarch64-linux-gnu/libc.so.6"
+// Target library paths for different platforms
+#ifdef __ANDROID_COMMON_KERNEL__
+    // Android GKI kernel - use APEX libc.so
+    #if defined(CONFIG_X86_64)
+    #define TARGET_PATH "/apex/com.android.runtime/lib64/bionic/libc.so"
+    #elif defined(CONFIG_ARM64)
+    #define TARGET_PATH "/apex/com.android.runtime/lib64/bionic/libc.so"
+    #else
+        #error "Unsupported architecture for Android"
+    #endif
+    #define KERNEL_TYPE "Android GKI"
 #else
-    #error "Unsupported architecture"
+    // Regular Linux kernel - use system libc.so
+    #if defined(CONFIG_X86_64)
+    #define TARGET_PATH "/lib/x86_64-linux-gnu/libc.so.6"
+    #elif defined(CONFIG_ARM64)
+    #define TARGET_PATH "/lib/aarch64-linux-gnu/libc.so.6"
+    #else
+        #error "Unsupported architecture for Linux"
+    #endif
+    #define KERNEL_TYPE "Linux"
 #endif
-
 
 #define SYMBOL_NAME "openat"
 // nm -D /lib/aarch64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
 // nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
+// nm -D /apex/com.android.runtime/lib64/bionic/libc.so | grep " openat@" | awk '{print $1}'
+
+// Module parameters
+static int target_uid = 1000;
+module_param(target_uid, int, 0644);
+MODULE_PARM_DESC(target_uid, "Target UID to monitor (-1 for all users, default: 1000)");
 
 static struct uprobe_consumer uprobe_consumer;
 static struct inode *target_inode;
@@ -151,6 +172,15 @@ static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
     char __user *filename;
     char filename_buf[256];
     ssize_t filename_len;
+    uid_t current_uid;
+
+    // Get current process UID
+    current_uid = from_kuid(&init_user_ns, current_uid());
+
+    // Check if we should filter by UID
+    if (target_uid != -1 && current_uid != target_uid) {
+        return 0; // Skip this process
+    }
 
 #if defined(CONFIG_X86_64)
     filename = (char __user *)regs->si;
@@ -176,8 +206,8 @@ static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
         return -EFAULT;
     }
 
-    // Print the full filename from the buffer
-    pr_info("uprobes: openat() filename: %s\n", filename_buf);
+    // Print the full filename from the buffer with UID info
+    pr_info("uprobes: [UID:%u] openat() filename: %s\n", current_uid, filename_buf);
 
     // Replace the filename with 'a' characters
     memset(filename_buf, 'a', filename_len);
@@ -202,9 +232,22 @@ static int __init uprobe_init(void) {
     struct path path;
     int ret;
 
+    // Print kernel type and target library
+    pr_info("uprobes: Running on %s kernel, targeting %s\n", KERNEL_TYPE, TARGET_PATH);
+
+    // Print configuration
+    if (target_uid == -1) {
+        pr_info("uprobes: Monitoring all users\n");
+    } else {
+        pr_info("uprobes: Monitoring UID %d\n", target_uid);
+    }
+
     ret = kern_path(TARGET_PATH, LOOKUP_FOLLOW, &path);
     if (ret) {
-        pr_err("uprobes: Failed to resolve path\n");
+        pr_err("uprobes: Failed to resolve path %s (error: %d)\n", TARGET_PATH, ret);
+#ifdef __ANDROID_COMMON_KERNEL__
+        pr_err("uprobes: Make sure Android APEX runtime is available\n");
+#endif
         return ret;
     }
 
@@ -212,9 +255,8 @@ static int __init uprobe_init(void) {
     path_put(&path);
 
     offset = find_symbol_offset(TARGET_PATH, SYMBOL_NAME);
-    // offset = 0x00000000000d7b80;
     if (!offset) {
-        pr_err("uprobes: Failed to find symbol %s\n", SYMBOL_NAME);
+        pr_err("uprobes: Failed to find symbol %s in %s\n", SYMBOL_NAME, TARGET_PATH);
         return -ENOENT;
     }
 
@@ -222,11 +264,12 @@ static int __init uprobe_init(void) {
 
     ret = uprobe_register(target_inode, offset, &uprobe_consumer);
     if (ret) {
-        pr_err("uprobes: Failed to register uprobe\n");
+        pr_err("uprobes: Failed to register uprobe (error: %d)\n", ret);
         return ret;
     }
 
-    pr_info("uprobes: Successfully registered uprobe\n");
+    pr_info("uprobes: Successfully registered uprobe for %s at offset 0x%lx\n",
+            TARGET_PATH, offset);
     return 0;
 }
 
@@ -243,5 +286,5 @@ module_exit(uprobe_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("fei_cong");
-MODULE_DESCRIPTION("Uprobe monitor for function: " SYMBOL_NAME);
-
+MODULE_DESCRIPTION("Uprobe hook sample");
+MODULE_VERSION("1.0");

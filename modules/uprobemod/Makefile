@@ -28,5 +28,22 @@ rmmod:
 	@sudo dmesg -c
 
 test:
-	@cat /proc/self/comm > /dev/null
-	@sudo dmesg -c > /dev/null
+	@echo "Testing uprobe with default parameters..."
+	bash -c "cat /proc/self/cmdline > /dev/null"
+	@sudo dmesg -c
+
+test-uid:
+	@echo "Testing uprobe with UID filtering (current user)..."
+	@sudo rmmod uprobemod 2>/dev/null || true
+	@sudo insmod uprobemod.ko target_uid=$(shell id -u)
+	@./test_openat || cat /proc/self/comm > /dev/null
+	@sudo dmesg | grep "uprobes:" | tail -5
+	@sudo rmmod uprobemod
+
+test-all-users:
+	@echo "Testing uprobe for all users..."
+	@sudo rmmod uprobemod 2>/dev/null || true
+	@sudo insmod uprobemod.ko target_uid=-1
+	@./test_openat || cat /proc/self/comm > /dev/null
+	@sudo dmesg | grep "uprobes:" | tail -5
+	@sudo rmmod uprobemod
