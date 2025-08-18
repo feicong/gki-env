@@ -104,13 +104,12 @@ static struct kprobe kp = { .symbol_name = "kallsyms_lookup_name" };
 static int __init sysmodule_init(void)
 {
 	int ret;
-
-	pr_info("sysmodule: 模块初始化\n");
+	pr_info("sysmodule: init.\n");
 
 	/* 注册 kprobe 以获取 kallsyms_lookup_name 的地址 */
 	ret = register_kprobe(&kp);
 	if (ret < 0) {
-		pr_err("注册 kprobe 失败, 错误码 %d\n",
+		pr_err("register kprobe failed, errno: %d\n",
 		       ret);
 		return ret;
 	}
@@ -119,7 +118,7 @@ static int __init sysmodule_init(void)
 	unregister_kprobe(&kp); /* 获取地址后立即注销 kprobe */
 
 	if (!kallsyms_lookup_name_func) {
-		pr_err("获取 kallsyms_lookup_name 地址失败\n");
+		pr_err("kallsyms_lookup_name address error\n");
 		return -ENXIO;
 	}
 
@@ -127,7 +126,7 @@ static int __init sysmodule_init(void)
 	kptr_restrict_p =
 		(int *)kallsyms_lookup_name_func("kptr_restrict");
 	if (!kptr_restrict_p) {
-		pr_err("查找 kptr_restrict 符号失败\n");
+		pr_err("lookup kptr_restrict failed\n");
 		return -ENXIO;
 	}
 
@@ -140,7 +139,7 @@ static int __init sysmodule_init(void)
 	ret = sysfs_create_file(sysmodule_kobj, &status_attribute.attr);
 	if (ret) {
 		kobject_put(sysmodule_kobj);
-		pr_err("创建 status 文件失败 /sys/kernel/sysmodule\n");
+		pr_err("create status failed /sys/kernel/sysmodule\n");
 		return ret;
 	}
 
@@ -159,7 +158,7 @@ static int __init sysmodule_init(void)
 		/* 如果失败，清理之前创建的 sysfs 入口 */
 		sysfs_remove_file(sysmodule_kobj, &status_attribute.attr);
 		kobject_put(sysmodule_kobj);
-		pr_err("注册 sysctl 失败\n");
+		pr_err("register sysctl failed\n");
 		return -ENOMEM;
 	}
 
@@ -168,7 +167,7 @@ static int __init sysmodule_init(void)
 
 static void __exit sysmodule_exit(void)
 {
-	pr_info("sysmodule: 模块退出\n");
+	pr_info("sysmodule: exit\n");
 	/* 注销 sysctl 表 */
 	unregister_sysctl_table(sysctl_header);
 	/* kobject_put 会自动处理 sysfs 文件的移除 */
