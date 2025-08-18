@@ -73,6 +73,7 @@ static int entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) {
         pr_info("Modified task state from TASK_TRACED to TASK_RUNNING for process %d\n", task->pid);
     }
 
+    pr_info("Modified TracerPid for process %d to 0\n", task->pid);
     task->ptrace = 0;  // 设置TracerPid为0
     task_unlock(task);
 
