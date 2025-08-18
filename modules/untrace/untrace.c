@@ -26,44 +26,55 @@ struct my_data {
 static int entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) {
     struct my_data *data;
     struct task_struct *task;
-
-    rcu_read_lock();
-
-    data = (struct my_data *)ri->data;
+    struct seq_file *m;
+    struct pid_namespace *ns;
     struct pid *pid;
 
+    data = (struct my_data *)ri->data;
+    data->task = NULL;
+
+    // 正确解析proc_pid_status的参数
+    // static int proc_pid_status(struct seq_file *m, struct pid_namespace *ns, struct pid *pid, struct task_struct *task)
 #if defined(CONFIG_X86_64)
+    m = (struct seq_file *)regs->di;
+    ns = (struct pid_namespace *)regs->si;
     pid = (struct pid *)regs->dx;
     task = (struct task_struct *)regs->cx;
 #elif defined(CONFIG_ARM64)
+    m = (struct seq_file *)regs->regs[0];
+    ns = (struct pid_namespace *)regs->regs[1];
     pid = (struct pid *)regs->regs[2];
     task = (struct task_struct *)regs->regs[3];
 #else
 #error "Unsupported architecture"
 #endif
 
-    data->task = NULL;
+    // 基本安全检查
+    if (!task) {
+        return 0;
+    }
 
-    if (task && !(task->mm)) {
-        rcu_read_unlock();
+    // 检查是否是内核线程
+    if (!task->mm) {
         return 0;    /* Skip kernel threads */
     }
 
-    // Modify task->ptrace safely using task_lock
+    // 获取任务引用，防止任务在处理过程中被释放
+    get_task_struct(task);
+
+    // 安全地修改任务状态
     task_lock(task);
     data->task = task;
-    data->original_ptrace = task->ptrace;  // Save original TracerPid
+    data->original_ptrace = task->ptrace;  // 保存原始TracerPid
 
-    data->original_state = READ_ONCE(task->__state);  // Save original task state
+    data->original_state = READ_ONCE(task->__state);  // 保存原始任务状态
     if (data->original_state == TASK_TRACED) {
-        WRITE_ONCE(task->__state, TASK_RUNNING);  // Use WRITE_ONCE to safely modify task state
+        WRITE_ONCE(task->__state, TASK_RUNNING);  // 安全地修改任务状态
         pr_info("Modified task state from TASK_TRACED to TASK_RUNNING for process %d\n", task->pid);
     }
 
-    task->ptrace = 0;  // Set TracerPid to 0
+    task->ptrace = 0;  // 设置TracerPid为0
     task_unlock(task);
-
-    rcu_read_unlock();
 
     return 0;
 }
@@ -75,13 +86,12 @@ static int ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs) {
     if (!task)
         return 0;
 
-    rcu_read_lock();
-
+    // 恢复任务状态
     task_lock(task);
-    task->ptrace = data->original_ptrace;  // Restore original TracerPid
+    task->ptrace = data->original_ptrace;  // 恢复原始TracerPid
 
     if (data->original_state == TASK_TRACED) {
-        WRITE_ONCE(task->__state, data->original_state);  // Restore original task state safely
+        WRITE_ONCE(task->__state, data->original_state);  // 安全地恢复原始任务状态
         pr_info("Restored task state to TASK_TRACED for process %d\n", task->pid);
     }
 
@@ -89,7 +99,8 @@ static int ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs) {
 
     pr_info("Restored TracerPid for process %d to %d\n", task->pid, data->original_ptrace);
 
-    rcu_read_unlock();
+    // 释放任务引用
+    put_task_struct(task);
 
     return 0;
 }
