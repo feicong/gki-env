@@ -34,16 +34,18 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
     struct file *file;
     struct elfhdr elf_header;
     struct elf_shdr *section_headers;
-    Elf64_Sym *dynsym;
-    char *dynstr;
+    Elf64_Sym *dynsym = NULL;
+    char *dynstr = NULL;
     loff_t offset = 0;
     ssize_t ret;
-    int i;
+    int i, j;
+    int dynsym_idx = -1, dynstr_idx = -1;
+    size_t dynsym_size = 0;
 
     file = filp_open(filename, O_RDONLY, 0);
     if (IS_ERR(file)) {
         pr_err("Failed to open %s\n", filename);
-        return -1;
+        return 0;
     }
 
     // Read ELF header
@@ -53,12 +55,21 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         goto cleanup;
     }
 
+    // Verify ELF magic
+    if (memcmp(elf_header.e_ident, ELFMAG, SELFMAG) != 0) {
+        pr_err("Invalid ELF file\n");
+        goto cleanup;
+    }
+
     // Read section headers
     section_headers = kmalloc(elf_header.e_shentsize * elf_header.e_shnum, GFP_KERNEL);
-    if (!section_headers)
+    if (!section_headers) {
+        pr_err("Failed to allocate memory for section headers\n");
         goto cleanup;
+    }
 
-    ret = kernel_read(file, section_headers, elf_header.e_shentsize * elf_header.e_shnum, (loff_t *)&elf_header.e_shoff);
+    loff_t shoff = elf_header.e_shoff;
+    ret = kernel_read(file, section_headers, elf_header.e_shentsize * elf_header.e_shnum, &shoff);
     if (ret < 0) {
         pr_err("Failed to read section headers\n");
         goto cleanup_section_headers;
@@ -67,28 +78,66 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
     // Find `.dynsym` and `.dynstr` sections
     for (i = 0; i < elf_header.e_shnum; i++) {
         if (section_headers[i].sh_type == SHT_DYNSYM) {
-            dynsym = kmalloc(section_headers[i].sh_size, GFP_KERNEL);
-            if (!dynsym)
-                goto cleanup_section_headers;
-            kernel_read(file, dynsym, section_headers[i].sh_size, (loff_t *)&section_headers[i].sh_offset);
+            dynsym_idx = i;
+            dynsym_size = section_headers[i].sh_size;
         }
-        if (section_headers[i].sh_type == SHT_STRTAB) {
-            dynstr = kmalloc(section_headers[i].sh_size, GFP_KERNEL);
-            if (!dynstr)
-                goto cleanup_dynsym;
-            kernel_read(file, dynstr, section_headers[i].sh_size, (loff_t *)&section_headers[i].sh_offset);
+        if (section_headers[i].sh_type == SHT_STRTAB && dynstr_idx == -1) {
+            // We want the .dynstr section, which is typically the first STRTAB
+            dynstr_idx = i;
         }
     }
 
-    // Traverse `.dynsym` and find `openat`
-    for (i = 0; i < section_headers[i].sh_size / sizeof(Elf64_Sym); i++) {
-        if (strcmp(dynstr + dynsym[i].st_name, symbol) == 0) {
-            offset = dynsym[i].st_value;
-            pr_info("Found symbol %s at offset: 0x%llx\n", symbol, offset);
-            break;
+    if (dynsym_idx == -1 || dynstr_idx == -1) {
+        pr_err("Could not find .dynsym or .dynstr sections\n");
+        goto cleanup_section_headers;
+    }
+
+    // Read .dynsym section
+    dynsym = kmalloc(dynsym_size, GFP_KERNEL);
+    if (!dynsym) {
+        pr_err("Failed to allocate memory for dynsym\n");
+        goto cleanup_section_headers;
+    }
+
+    loff_t dynsym_offset = section_headers[dynsym_idx].sh_offset;
+    ret = kernel_read(file, dynsym, dynsym_size, &dynsym_offset);
+    if (ret < 0) {
+        pr_err("Failed to read .dynsym section\n");
+        goto cleanup_dynsym;
+    }
+
+    // Read .dynstr section
+    dynstr = kmalloc(section_headers[dynstr_idx].sh_size, GFP_KERNEL);
+    if (!dynstr) {
+        pr_err("Failed to allocate memory for dynstr\n");
+        goto cleanup_dynsym;
+    }
+
+    loff_t dynstr_offset = section_headers[dynstr_idx].sh_offset;
+    ret = kernel_read(file, dynstr, section_headers[dynstr_idx].sh_size, &dynstr_offset);
+    if (ret < 0) {
+        pr_err("Failed to read .dynstr section\n");
+        goto cleanup_dynstr;
+    }
+
+    // Traverse `.dynsym` and find the symbol
+    for (j = 0; j < dynsym_size / sizeof(Elf64_Sym); j++) {
+        if (dynsym[j].st_name < section_headers[dynstr_idx].sh_size) {
+            char *sym_name = dynstr + dynsym[j].st_name;
+            if (strcmp(sym_name, symbol) == 0) {
+                offset = dynsym[j].st_value;
+                pr_info("Found symbol %s at offset: 0x%llx\n", symbol, offset);
+                break;
+            }
         }
     }
 
+    if (offset == 0) {
+        pr_err("Symbol %s not found\n", symbol);
+    }
+
+cleanup_dynstr:
+    kfree(dynstr);
 cleanup_dynsym:
     kfree(dynsym);
 cleanup_section_headers:
@@ -163,7 +212,7 @@ static int __init uprobe_init(void) {
     path_put(&path);
 
     offset = find_symbol_offset(TARGET_PATH, SYMBOL_NAME);
-    offset = 0x00000000000d7b80;
+    // offset = 0x00000000000d7b80;
     if (!offset) {
         pr_err("uprobes: Failed to find symbol %s\n", SYMBOL_NAME);
         return -ENOENT;

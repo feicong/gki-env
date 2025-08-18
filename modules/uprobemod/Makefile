@@ -28,5 +28,5 @@ rmmod:
 	@sudo dmesg -c
 
 test:
-	@cat /proc/self/comm
-	@sudo dmesg -c
+	@cat /proc/self/comm > /dev/null
+	@sudo dmesg -c > /dev/null
