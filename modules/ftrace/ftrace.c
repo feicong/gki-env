@@ -85,7 +85,7 @@ static int fh_resolve_hook_address(struct ftrace_hook *hook)
 {
 	hook->address = lookup_name(hook->name);
 	if (!hook->address) {
-		pr_debug("无法解析符号地址: %s\n", hook->name);
+		pr_debug("lookup symbol failed: %s\n", hook->name);
 		return -ENOENT;
 	}
 
@@ -128,7 +128,7 @@ int fh_install_hook(struct ftrace_hook *hook)
 	if (err)
 		return err;
 
-	pr_debug("目标地址: %s = 0x%lx", hook->name, hook->address);
+	pr_debug("target address: %s = 0x%lx", hook->name, hook->address);
 
 	hook->ops.func = fh_ftrace_thunk;
 #ifdef CONFIG_ARM64
@@ -143,13 +143,13 @@ int fh_install_hook(struct ftrace_hook *hook)
 
 	err = ftrace_set_filter(&hook->ops, (unsigned char *)hook->name, strlen(hook->name), 0);
 	if (err) {
-		pr_debug("ftrace_set_filter() 失败: %d\n", err);
+		pr_debug("ftrace_set_filter() failed: %d\n", err);
 		return err;
 	}
 
 	err = register_ftrace_function(&hook->ops);
 	if (err) {
-		pr_debug("register_ftrace_function() 失败: %d\n", err);
+		pr_debug("register_ftrace_function() failed: %d\n", err);
 		ftrace_set_filter_ip(&hook->ops, hook->address, 1, 0);
 		return err;
 	}
@@ -162,12 +162,12 @@ void fh_remove_hook(struct ftrace_hook *hook)
 	int err;
 	err = unregister_ftrace_function(&hook->ops);
 	if (err) {
-		pr_debug("unregister_ftrace_function() 失败: %d\n", err);
+		pr_debug("unregister_ftrace_function() failed: %d\n", err);
 	}
 
 	err = ftrace_set_filter(&hook->ops,  NULL, 0, 1);
 	if (err) {
-		pr_debug("ftrace_set_filter() 失败: %d\n", err);
+		pr_debug("ftrace_set_filter() failed: %d\n", err);
 	}
 }
 
@@ -214,18 +214,18 @@ static void parse_and_print_dirents_user(unsigned long user_buf, long nbytes)
 
 	/* 限制最大复制大小以防 OOM（这里设置为 1MB） */
 	if (nbytes > (1 << 20)) {
-		pr_warn("返回字节过大 (%ld)，限制为 1MB\n", nbytes);
+		pr_warn("nbytes to long: (%ld), limit 1MB\n", nbytes);
 		nbytes = (1 << 20);
 	}
 
 	kbuf = kmalloc(nbytes, GFP_KERNEL);
 	if (!kbuf) {
-		pr_err("kmalloc 失败，大小 %ld\n", nbytes);
+		pr_err("kmalloc failed，大小 %ld\n", nbytes);
 		return;
 	}
 
 	if (copy_from_user(kbuf, (void __user *)user_buf, nbytes)) {
-		pr_warn("copy_from_user 失败（dirents）\n");
+		pr_warn("copy_from_user failed（dirents）\n");
 		kfree(kbuf);
 		return;
 	}
@@ -280,14 +280,14 @@ asmlinkage long fh_sys_getdents64(struct pt_regs *regs)
 #elif defined(CONFIG_ARM64)
 	user_buf = regs->regs[1];
 #else
-	pr_warn("未支持的架构，无法解析参数\n");
+	pr_warn("unsupported arch\n");
 #endif
 
 	/* 调用原始实现（保持行为不变） */
 	ret = real_sys_getdents64(regs);
 
 	/* 调用后打印返回值 */
-	pr_info("getdents64() 调用后: pid=%d ret=%ld\n", current->pid, ret);
+	pr_info("getdents64() after: pid=%d ret=%ld\n", current->pid, ret);
 
 	/* 若返回了数据，则尝试解析用户缓冲区并打印每个 d_name（只读） */
 	if (ret > 0 && user_buf)
@@ -302,7 +302,7 @@ asmlinkage long fh_sys_getdents64(struct pt_regs *regs)
 # elif defined(CONFIG_X86_64)
 #  define SYSCALL_NAME(name) ("__x64_" name)
 # else
-# error "未支持的架构"
+# error "unsupported architecture for syscall name"
 # endif
 
 /* Hook 定义宏 */
@@ -325,7 +325,7 @@ static int fh_init(void)
 	err = fh_install_hooks(demo_hooks, ARRAY_SIZE(demo_hooks));
 	if (err)
 		return err;
-	pr_info("模块加载成功\n");
+	pr_info("fh_init done.\n");
 	return 0;
 }
 module_init(fh_init);
@@ -334,6 +334,6 @@ module_init(fh_init);
 static void fh_exit(void)
 {
 	fh_remove_hooks(demo_hooks, ARRAY_SIZE(demo_hooks));
-	pr_info("模块卸载成功\n");
+	pr_info("fh_exit done.\n");
 }
 module_exit(fh_exit);

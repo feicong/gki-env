@@ -1,5 +1,12 @@
-# /* Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/ebpf-course) */
-load("//build/kernel/kleaf:kernel.bzl", "kernel_module", "kernel_modules_install")
+# Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/ebpf-course)
+load("@//build/kernel/kleaf:kernel.bzl", "kernel_module", "kernel_modules_install")
+
+# 向下面一样补丁visibility: android13-5.15-167/common-modules/virtual-device/BUILD.bazel
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
 
 filegroup(
     name = "lkm_sources",
@@ -23,12 +30,12 @@ kernel_module (
     outs = [
         "ftrace.ko",
     ],
-    kernel_build = "//common:kernel_x86_64",
+    kernel_build = "//common-modules/virtual-device:virtual_device_x86_64",
 )
 
 kernel_modules_install(
     name = "ftrace_install",
-    kernel_build = "//common:kernel_x86_64",
+    kernel_build = "//common-modules/virtual-device:virtual_device_x86_64",
     kernel_modules = [
         ":ftrace",
     ],
@@ -40,12 +47,12 @@ kernel_module (
     outs = [
         "ftrace.ko",
     ],
-    kernel_build = "//common:kernel_aarch64",
+    kernel_build = "//common-modules/virtual-device:virtual_device_aarch64",
 )
 
 kernel_modules_install(
     name = "ftrace_aarch64_install",
-    kernel_build = "//common:kernel_aarch64",
+    kernel_build = "//common-modules/virtual-device:virtual_device_aarch64",
     kernel_modules = [
         ":ftrace",
     ],
