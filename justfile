@@ -698,7 +698,7 @@ test-cvd-mod modname:
     #!/bin/bash
     set -e
     echo "正在测试安卓内核模块 {{modname}}..."
-    adb push {{CONFIG}}/bazel-bin/common-modules/virtual-device/{{modname}}/{{modname}}.ko /data/local/tmp/{{modname}}.ko
+    adb push {{CONFIG}}/bazel-bin/common-modules/virtual-device/{{modname}}/{{modname}}/{{modname}}.ko /data/local/tmp/{{modname}}.ko
     adb shell "su 0 dmesg -c"
     adb shell "su 0 insmod /data/local/tmp/{{modname}}.ko"
     if [ $? -ne 0 ]; then

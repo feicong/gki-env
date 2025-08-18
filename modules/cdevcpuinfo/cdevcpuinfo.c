@@ -18,7 +18,12 @@ static dev_t dev_number;
 static struct class *fakecpu_class = NULL;
 static struct cdev fakecpu_cdev;
 
-static char *fakecpu_devnode(const struct device *dev, short unsigned int *mode)
+// TODO: 这是的6.8是我本地测试，可能版本不对，请根据实际情况修改
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+static char *fakecpu_devnode(const struct device *dev, umode_t *mode)
+#else
+static char *fakecpu_devnode(struct device *dev, umode_t *mode)
+#endif
 {
 	if (mode)
 		*mode = 0444; // r--r--r--
