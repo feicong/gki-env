@@ -41,6 +41,7 @@
 // nm -D /lib/aarch64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
 // nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
 // nm -D /apex/com.android.runtime/lib64/bionic/libc.so | grep " openat@" | awk '{print $1}'
+// sudo bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:openat {printf("%s\n", str(arg2));}'
 
 // Module parameters
 static int target_uid = 1000;
