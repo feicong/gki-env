@@ -1,0 +1,52 @@
+# /* Copyright (c) 2025-2026 fei_cong(https://github.com/feicong/ebpf-course) */
+load("//build/kernel/kleaf:kernel.bzl", "kernel_module", "kernel_modules_install")
+
+filegroup(
+    name = "lkm_sources",
+    srcs = glob(
+        [
+            "**/*.c",
+            "**/*.h",
+            "Kbuild",
+        ],
+        exclude = [
+            "BUILD.bazel*",
+            "**/*.bzl",
+            ".git/**",
+        ],
+    ),
+)
+
+kernel_module (
+    name = "untrace",
+    srcs = [":lkm_sources"],
+    outs = [
+        "untrace.ko",
+    ],
+    kernel_build = "//common:kernel_x86_64",
+)
+
+kernel_modules_install(
+    name = "untrace_install",
+    kernel_build = "//common:kernel_x86_64",
+    kernel_modules = [
+        ":untrace",
+    ],
+)
+
+kernel_module (
+    name = "untrace_aarch64",
+    srcs = [":lkm_sources"],
+    outs = [
+        "untrace.ko",
+    ],
+    kernel_build = "//common:kernel_aarch64",
+)
+
+kernel_modules_install(
+    name = "untrace_aarch64_install",
+    kernel_build = "//common:kernel_aarch64",
+    kernel_modules = [
+        ":untrace",
+    ],
+)
