@@ -23,11 +23,28 @@ kernel_module (
     outs = [
         "cpuinfo.ko",
     ],
-    kernel_build = "//common:kernel_aarch64",
+    kernel_build = "//common:kernel_x86_64",
 )
 
 kernel_modules_install(
     name = "cpuinfo_install",
+    kernel_build = "//common:kernel_x86_64",
+    kernel_modules = [
+        ":cpuinfo",
+    ],
+)
+
+kernel_module (
+    name = "cpuinfo_aarch64",
+    srcs = [":lkm_sources"],
+    outs = [
+        "cpuinfo.ko",
+    ],
+    kernel_build = "//common:kernel_aarch64",
+)
+
+kernel_modules_install(
+    name = "cpuinfo_aarch64_install",
     kernel_build = "//common:kernel_aarch64",
     kernel_modules = [
         ":cpuinfo",

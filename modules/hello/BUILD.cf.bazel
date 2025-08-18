@@ -40,3 +40,20 @@ kernel_modules_install(
         ":hello",
     ],
 )
+
+kernel_module (
+    name = "hello_aarch64",
+    srcs = [":lkm_sources"],
+    outs = [
+        "hello.ko",
+    ],
+    kernel_build = "//common-modules/virtual-device:virtual_device_aarch64",
+)
+
+kernel_modules_install(
+    name = "hello_aarch64_install",
+    kernel_build = "//common-modules/virtual-device:virtual_device_aarch64",
+    kernel_modules = [
+        ":hello",
+    ],
+)

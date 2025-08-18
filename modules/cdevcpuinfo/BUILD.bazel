@@ -23,11 +23,28 @@ kernel_module (
     outs = [
         "cdevcpuinfo.ko",
     ],
-    kernel_build = "//common:kernel_aarch64",
+    kernel_build = "//common:kernel_x86_64",
 )
 
 kernel_modules_install(
     name = "cdevcpuinfo_install",
+    kernel_build = "//common:kernel_x86_64",
+    kernel_modules = [
+        ":cdevcpuinfo",
+    ],
+)
+
+kernel_module (
+    name = "cdevcpuinfo_aarch64",
+    srcs = [":lkm_sources"],
+    outs = [
+        "cdevcpuinfo.ko",
+    ],
+    kernel_build = "//common:kernel_aarch64",
+)
+
+kernel_modules_install(
+    name = "cdevcpuinfo_aarch64_install",
     kernel_build = "//common:kernel_aarch64",
     kernel_modules = [
         ":cdevcpuinfo",

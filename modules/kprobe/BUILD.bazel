@@ -18,35 +18,35 @@ filegroup(
 )
 
 kernel_module (
-    name = "hello",
+    name = "kprobe",
     srcs = [":lkm_sources"],
     outs = [
-        "hello.ko",
+        "kprobe.ko",
     ],
     kernel_build = "//common:kernel_x86_64",
 )
 
 kernel_modules_install(
-    name = "hello_install",
+    name = "kprobe_install",
     kernel_build = "//common:kernel_x86_64",
     kernel_modules = [
-        ":hello",
+        ":kprobe",
     ],
 )
 
 kernel_module (
-    name = "hello_aarch64",
+    name = "kprobe_aarch64",
     srcs = [":lkm_sources"],
     outs = [
-        "hello.ko",
+        "kprobe.ko",
     ],
     kernel_build = "//common:kernel_aarch64",
 )
 
 kernel_modules_install(
-    name = "hello_aarch64_install",
+    name = "kprobe_aarch64_install",
     kernel_build = "//common:kernel_aarch64",
     kernel_modules = [
-        ":hello",
+        ":kprobe",
     ],
 )
