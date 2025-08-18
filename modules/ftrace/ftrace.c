@@ -18,6 +18,17 @@ MODULE_DESCRIPTION("使用 ftrace getdents64()");
 MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_LICENSE("GPL");
 
+/* 关闭尾调用优化（尽量按函数粒度使用） */
+#if defined(__clang__)
+#  if __has_attribute(disable_tail_calls)
+#    define ATTR_NO_TAILCALL __attribute__((disable_tail_calls))
+#  else
+#    define ATTR_NO_TAILCALL /* 无法禁用，留空 */
+#  endif
+#else /* 偏向 GCC */
+#  define ATTR_NO_TAILCALL __attribute__((optimize("-fno-optimize-sibling-calls")))
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
 /* 在新内核中，通过临时注册 kprobe 获取符号地址 */
 static unsigned long lookup_name(const char *name)
@@ -190,10 +201,6 @@ void fh_remove_hooks(struct ftrace_hook *hooks, size_t count)
 #error 目前仅支持 x86_64 与 arm64 架构
 #endif
 
-#if !USE_FENTRY_OFFSET
-#pragma GCC optimize("-fno-optimize-sibling-calls")
-#endif
-
 static asmlinkage long (*real_sys_getdents64)(struct pt_regs *regs);
 
 /* 辅助：安全解析并打印用户缓冲区中 linux_dirent64 的 d_name */
@@ -260,10 +267,10 @@ static void parse_and_print_dirents_user(unsigned long user_buf, long nbytes)
 }
 
 /* 我们的 pt_regs 风格 wrapper：在调用前打印参数，调用原始实现后打印返回值并解析 names */
-static asmlinkage long fh_sys_getdents64(struct pt_regs *regs)
+static ATTR_NO_TAILCALL
+asmlinkage long fh_sys_getdents64(struct pt_regs *regs)
 {
 	unsigned long user_buf = 0;
-	unsigned int count = 0;
 	long ret;
 
 	/* 从 regs 中提取参数：不同架构寄存器位置不同 */

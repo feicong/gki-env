@@ -8,6 +8,8 @@
         "chrono": "c",
         "map": "c",
         "set": "c",
+        "__config": "c",
+        "*.inc": "c"
     },
     "files.exclude": {
         "**/*.d": true,

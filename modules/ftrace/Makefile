@@ -1,23 +1,30 @@
 # Copyright (C) 2025-2026 fei_cong(https://github.com/feicong/feicong-course)
-obj-m += ftrace.o
+ifeq ($(KERNEL_SRC),)
+KERNEL_SRC := android13-5.15-167/out/android13-5.15/common
+# KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
+endif
 
-KDIR := /lib/modules/$(shell uname -r)/build
-PWD  := $(shell pwd)
+THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+M := $(dir $(THIS_MAKEFILE))
+		
+ifneq ($(KERNELRELEASE),)
+	# call from kernel build system
+	obj-m := ftrace.o
 
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+else
 
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+modules modules_install clean:
+	$(MAKE) -C $(KERNEL_SRC) M=$(M) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" $(@)
+
+endif
 
 insmod:
 	@sudo dmesg -c
-	sudo insmod ftrace.ko
+	@sudo insmod ftrace.ko
 
 rmmod:
-	sudo rmmod ftrace.ko
+	@sudo rmmod ftrace.ko
 	@sudo dmesg -c
 
 test:
-	@ls
 	@sudo dmesg -c
