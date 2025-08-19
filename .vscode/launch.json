@@ -1,0 +1,77 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach GDB to CVD Kernel",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/android13-5.15-167/bazel-bin/common/kernel_x86_64/vmlinux",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "targetArchitecture": "x86_64",
+            "miDebuggerServerAddress": "localhost:1234",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Disable pagination",
+                    "text": "set pagination off",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Use hardware breakpoints by default",
+                    "text": "set breakpoint auto-hw on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Disable memory write verification",
+                    "text": "set mem inaccessible-by-default off",
+                    "ignoreFailures": true
+                }
+            ],
+            "customLaunchSetupCommands": [
+                {
+                    "text": "file ${workspaceFolder}/android13-5.15-167/bazel-bin/common/kernel_x86_64/vmlinux",
+                    "description": "Load kernel symbols"
+                },
+                {
+                    "text": "set architecture i386:x86-64",
+                    "description": "Set target architecture"
+                },
+                {
+                    "text": "target remote localhost:1234",
+                    "description": "Connect to CVD kernel via GDB remote"
+                },
+                {
+                    "text": "set breakpoint auto-hw on",
+                    "description": "Enable hardware breakpoints"
+                },
+                {
+                    "text": "set can-use-hw-watchpoints 1",
+                    "description": "Enable hardware watchpoints"
+                },
+                {
+                    "text": "info registers",
+                    "description": "Show current registers"
+                }
+            ],
+            "launchCompleteCommand": "None",
+            "logging": {
+                "engineLogging": true,
+                "programOutput": true,
+                "trace": true
+            }
+        }
+    ]
+}
