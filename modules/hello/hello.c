@@ -14,5 +14,5 @@ module_init(hello_init);
 module_exit(hello_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("fei_cong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("Simple hello module");

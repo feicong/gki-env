@@ -4,7 +4,7 @@
 #include <linux/seq_file.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("feicong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("Create /proc/fake_cpuinfo with custom content");
 MODULE_VERSION("0.1");
 

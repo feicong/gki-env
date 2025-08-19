@@ -17,7 +17,7 @@
 #include <linux/fs.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("feicong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("Hide library from /proc/[pid]/maps");
 
 // 模块参数

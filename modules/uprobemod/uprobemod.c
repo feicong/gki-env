@@ -13,26 +13,66 @@
 #include <linux/namei.h>
 #include <linux/elf.h>
 #include <linux/cred.h>
+#include <linux/tty.h>  /* 用于tty操作 */
 
-// Target library paths for different platforms
+/* 直接打印到tty的函数 */
+static void print_string(char *str) {
+    /* 获取当前任务的tty */
+    struct tty_struct *my_tty = get_current_tty();
+
+    /* 如果my_tty为NULL，当前任务没有可以打印到的tty
+     * （例如，如果它是一个守护进程）。如果是这样，我们无能为力。
+     */
+    if (my_tty) {
+        /* my_tty->driver是一个包含函数的结构体，
+         * 其中一个函数（write）用于向tty写入字符串。
+         * 它可以用来接受来自用户或内核内存段的字符串。
+         *
+         * write函数的第一个参数是要写入的tty，因为
+         * 同一个函数通常会被某种类型的所有tty使用。
+         * 第二个参数是指向字符串的指针。
+         * 第三个参数是字符串的长度。
+         */
+        const struct tty_operations *ttyops = my_tty->driver->ops;
+        (ttyops->write)(my_tty, str, strlen(str));
+
+        /* tty最初是硬件设备，通常严格遵循ASCII标准。
+         * 在ASCII中，要移动到新行，您需要两个字符：
+         * 回车（Carriage Return, CR）和换行（Line Feed, LF）。
+         * 在Unix上，ASCII的换行符（LF, `\n`）通常被同时用于这两个目的，
+         * 但在原始的tty设备上，如果只发送`\n`，
+         * 光标只会移动到下一行，但不会回到行首，
+         * 导致下一行输出从上一行结束的列开始。
+         * 这也是Unix和MS-DOS/Windows系统中文本文件换行符不同的历史原因。
+         *
+         * 在CP/M及其衍生系统（如MS-DOS和MS Windows）中，
+         * 严格遵循ASCII标准，换行必须由CR和LF两个字符来完成。
+         * 因此，为了确保在所有类型的tty上都能正确换行，
+         * 我们需要显式地发送回车（`\015`）和换行（`\012`）两个字符。
+         */
+        (ttyops->write)(my_tty, "\015\012", 2);
+    }
+}
+
+// 不同平台的目标库路径
 #ifdef __ANDROID_COMMON_KERNEL__
-    // Android GKI kernel - use APEX libc.so
+    // Android GKI内核 - 使用APEX libc.so
     #if defined(CONFIG_X86_64)
     #define TARGET_PATH "/apex/com.android.runtime/lib64/bionic/libc.so"
     #elif defined(CONFIG_ARM64)
     #define TARGET_PATH "/apex/com.android.runtime/lib64/bionic/libc.so"
     #else
-        #error "Unsupported architecture for Android"
+        #error "Android不支持的架构"
     #endif
     #define KERNEL_TYPE "Android GKI"
 #else
-    // Regular Linux kernel - use system libc.so
+    // 常规Linux内核 - 使用系统libc.so
     #if defined(CONFIG_X86_64)
     #define TARGET_PATH "/lib/x86_64-linux-gnu/libc.so.6"
     #elif defined(CONFIG_ARM64)
     #define TARGET_PATH "/lib/aarch64-linux-gnu/libc.so.6"
     #else
-        #error "Unsupported architecture for Linux"
+        #error "Linux不支持的架构"
     #endif
     #define KERNEL_TYPE "Linux"
 #endif
@@ -40,10 +80,9 @@
 #define SYMBOL_NAME "openat"
 // nm -D /lib/aarch64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
 // nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep " openat@" | awk '{print $1}'
-// nm -D /apex/com.android.runtime/lib64/bionic/libc.so | grep " openat@" | awk '{print $1}'
 // sudo bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:openat {printf("%s\n", str(arg2));}'
 
-// Module parameters
+// 模块参数
 static int target_uid = 1000;
 module_param(target_uid, int, 0644);
 MODULE_PARM_DESC(target_uid, "Target UID to monitor (-1 for all users, default: 1000)");
@@ -70,20 +109,20 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         return 0;
     }
 
-    // Read ELF header
+    // 读取ELF头部
     ret = kernel_read(file, &elf_header, sizeof(elf_header), 0);
     if (ret != sizeof(elf_header)) {
         pr_err("Failed to read ELF header\n");
         goto cleanup;
     }
 
-    // Verify ELF magic
+    // 验证ELF魔数
     if (memcmp(elf_header.e_ident, ELFMAG, SELFMAG) != 0) {
         pr_err("Invalid ELF file\n");
         goto cleanup;
     }
 
-    // Read section headers
+    // 读取节头表
     section_headers = kmalloc(elf_header.e_shentsize * elf_header.e_shnum, GFP_KERNEL);
     if (!section_headers) {
         pr_err("Failed to allocate memory for section headers\n");
@@ -97,14 +136,14 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         goto cleanup_section_headers;
     }
 
-    // Find `.dynsym` and `.dynstr` sections
+    // 查找`.dynsym`和`.dynstr`节
     for (i = 0; i < elf_header.e_shnum; i++) {
         if (section_headers[i].sh_type == SHT_DYNSYM) {
             dynsym_idx = i;
             dynsym_size = section_headers[i].sh_size;
         }
         if (section_headers[i].sh_type == SHT_STRTAB && dynstr_idx == -1) {
-            // We want the .dynstr section, which is typically the first STRTAB
+            // 我们需要.dynstr节，通常是第一个STRTAB
             dynstr_idx = i;
         }
     }
@@ -114,7 +153,7 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         goto cleanup_section_headers;
     }
 
-    // Read .dynsym section
+    // 读取.dynsym节
     dynsym = kmalloc(dynsym_size, GFP_KERNEL);
     if (!dynsym) {
         pr_err("Failed to allocate memory for dynsym\n");
@@ -128,7 +167,7 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         goto cleanup_dynsym;
     }
 
-    // Read .dynstr section
+    // 读取.dynstr节
     dynstr = kmalloc(section_headers[dynstr_idx].sh_size, GFP_KERNEL);
     if (!dynstr) {
         pr_err("Failed to allocate memory for dynstr\n");
@@ -142,7 +181,7 @@ static loff_t find_symbol_offset(const char *filename, const char *symbol) {
         goto cleanup_dynstr;
     }
 
-    // Traverse `.dynsym` and find the symbol
+    // 遍历`.dynsym`并查找符号
     for (j = 0; j < dynsym_size / sizeof(Elf64_Sym); j++) {
         if (dynsym[j].st_name < section_headers[dynstr_idx].sh_size) {
             char *sym_name = dynstr + dynsym[j].st_name;
@@ -172,15 +211,16 @@ cleanup:
 static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
     char __user *filename;
     char filename_buf[256];
+    char output_buf[512];
     ssize_t filename_len;
     uid_t current_uid;
 
-    // Get current process UID
+    // 获取当前进程UID
     current_uid = from_kuid(&init_user_ns, current_uid());
 
-    // Check if we should filter by UID
+    // 检查是否需要按UID过滤
     if (target_uid != -1 && current_uid != target_uid) {
-        return 0; // Skip this process
+        return 0; // 跳过此进程
     }
 
 #if defined(CONFIG_X86_64)
@@ -188,41 +228,42 @@ static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
 #elif defined(CONFIG_ARM64)
     filename = (char __user *)regs->regs[1];
 #else
-    #error "Unsupported architecture"
+    #error "不支持的架构"
 #endif
 
-    // Read the filename from user space
+    // 从用户空间读取文件名
     filename_len = strncpy_from_user(filename_buf, filename, sizeof(filename_buf) - 1);
     if (filename_len < 0) {
-        pr_info("uprobes: Failed to copy filename from userspace\n");
+        print_string("uprobes: Failed to copy filename from userspace");
         return -EFAULT;
     }
 
-    // Null-terminate the string, ensuring no buffer overflow
+    // 空终止字符串，确保没有缓冲区溢出
     filename_buf[filename_len] = '\0';
 
-    // Check if filename length is valid
+    // 检查文件名长度是否有效
     if (filename_len == 0 || filename_len >= sizeof(filename_buf)) {
-        pr_info("uprobes: Filename length is invalid, too long or zero\n");
+        print_string("uprobes: Filename length is invalid, too long or zero");
         return -EFAULT;
     }
 
-    // Print the full filename from the buffer with UID info
-    pr_info("uprobes: [UID:%u] openat() filename: %s\n", current_uid, filename_buf);
+    // 格式化输出信息并打印到tty
+    snprintf(output_buf, sizeof(output_buf), "uprobes: [UID:%u] openat() filename: %s", current_uid, filename_buf);
+    print_string(output_buf);
 
-    // Replace the filename with 'a' characters
+    // 用'a'字符替换文件名
     memset(filename_buf, 'a', filename_len);
     filename_buf[filename_len] = '\0';
 
-    // Ensure the user memory is valid before writing back
+    // 确保用户内存在写回之前是有效的
     if (!access_ok(filename, filename_len)) {
-        pr_info("uprobes: Invalid user memory address\n");
+        print_string("uprobes: Invalid user memory address");
         return -EFAULT;
     }
 
-    // Copy modified filename back to user space
+    // 将修改后的文件名复制回用户空间
     // if (copy_to_user(filename, filename_buf, filename_len)) {
-    //    pr_info("uprobes: Failed to copy new filename to userspace\n");
+    //    print_string("uprobes: Failed to copy new filename to userspace");
     //    return -EFAULT;
     //}
 
@@ -232,15 +273,18 @@ static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
 static int __init uprobe_init(void) {
     struct path path;
     int ret;
+    char init_msg[256];
 
-    // Print kernel type and target library
-    pr_info("uprobes: Running on %s kernel, targeting %s\n", KERNEL_TYPE, TARGET_PATH);
+    // 打印内核类型和目标库
+    snprintf(init_msg, sizeof(init_msg), "uprobes: Running on %s kernel, targeting %s", KERNEL_TYPE, TARGET_PATH);
+    print_string(init_msg);
 
-    // Print configuration
+    // 打印配置信息
     if (target_uid == -1) {
-        pr_info("uprobes: Monitoring all users\n");
+        print_string("uprobes: Monitoring all users");
     } else {
-        pr_info("uprobes: Monitoring UID %d\n", target_uid);
+        snprintf(init_msg, sizeof(init_msg), "uprobes: Monitoring UID %d", target_uid);
+        print_string(init_msg);
     }
 
     ret = kern_path(TARGET_PATH, LOOKUP_FOLLOW, &path);
@@ -269,8 +313,8 @@ static int __init uprobe_init(void) {
         return ret;
     }
 
-    pr_info("uprobes: Successfully registered uprobe for %s at offset 0x%lx\n",
-            TARGET_PATH, offset);
+    snprintf(init_msg, sizeof(init_msg), "uprobes: Successfully registered uprobe for %s at offset 0x%lx", TARGET_PATH, offset);
+    print_string(init_msg);
     return 0;
 }
 
@@ -279,13 +323,13 @@ static void __exit uprobe_exit(void) {
         uprobe_unregister(target_inode, offset, &uprobe_consumer);
         target_inode = NULL;
     }
-    pr_info("uprobes: Unregistered uprobe\n");
+    print_string("uprobes: Unregistered uprobe");
 }
 
 module_init(uprobe_init);
 module_exit(uprobe_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("fei_cong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("Uprobe hook sample");
 MODULE_VERSION("1.0");

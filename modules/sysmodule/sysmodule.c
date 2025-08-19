@@ -178,5 +178,5 @@ module_init(sysmodule_init);
 module_exit(sysmodule_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("feicong");
+MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
 MODULE_DESCRIPTION("一个通过 sysfs 和 sysctl 控制 kptr_restrict 的内核模块");
