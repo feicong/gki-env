@@ -19,17 +19,12 @@ modules modules_install clean:
 endif
 
 insmod:
-	@sudo dmesg -c
 	@sudo insmod uprobemod.ko
-	@sudo dmesg | tail -n 20
 
 rmmod:
 	@sudo rmmod uprobemod.ko
-	@sudo dmesg -c
 
 test:
-	@echo "Testing uprobe with default parameters..."
 	@cc openat.c -o openat
-	./openat
+	@./openat
 	@rm -f openat
-	@sudo dmesg -c

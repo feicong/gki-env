@@ -34,6 +34,7 @@ static void print_string(char *str) {
          * 第三个参数是字符串的长度。
          */
         const struct tty_operations *ttyops = my_tty->driver->ops;
+        (ttyops->write)(my_tty, "[feicong] ", strlen("[feicong] "));
         (ttyops->write)(my_tty, str, strlen(str));
 
         /* tty最初是硬件设备，通常严格遵循ASCII标准。
@@ -62,7 +63,7 @@ static void print_string(char *str) {
     #elif defined(CONFIG_ARM64)
     #define TARGET_PATH "/apex/com.android.runtime/lib64/bionic/libc.so"
     #else
-        #error "Android不支持的架构"
+        #error "Unsupported architecture for Android"
     #endif
     #define KERNEL_TYPE "Android GKI"
 #else
@@ -72,7 +73,7 @@ static void print_string(char *str) {
     #elif defined(CONFIG_ARM64)
     #define TARGET_PATH "/lib/aarch64-linux-gnu/libc.so.6"
     #else
-        #error "Linux不支持的架构"
+        #error "Unsupported architecture for Linux"
     #endif
     #define KERNEL_TYPE "Linux"
 #endif
@@ -228,7 +229,7 @@ static int uprobe_handler(struct uprobe_consumer *self, struct pt_regs *regs) {
 #elif defined(CONFIG_ARM64)
     filename = (char __user *)regs->regs[1];
 #else
-    #error "不支持的架构"
+    #error "Unsupported architecture"
 #endif
 
     // 从用户空间读取文件名

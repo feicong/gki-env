@@ -647,7 +647,7 @@ test-mod modname:
     if [ $? -ne 0 ]; then
         echo "{{modname}} 内核模块测试失败，请检查日志。"
     fi
-    echo "测试成功"
+    echo "{{modname}} 内核模块测试成功"
     make rmmod KERNEL_SRC=/lib/modules/$(uname -r)/build
     if [ $? -ne 0 ]; then
         echo "{{modname}} 内核模块卸载失败，请检查日志。"

@@ -33,3 +33,4 @@ bootimgs/
 .env
 *.usyms
 mountcpuinfo
+openat
