@@ -297,7 +297,9 @@ static int __init uprobe_init(void) {
         return ret;
     }
 
+    // 使用路径信息
     target_inode = d_inode(path.dentry);
+    // 释放路径引用，对应kern_path的引用获取
     path_put(&path);
 
     offset = find_symbol_offset(TARGET_PATH, SYMBOL_NAME);
