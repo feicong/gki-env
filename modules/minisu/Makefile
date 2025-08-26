@@ -1,5 +1,4 @@
 MODULE_NAME := minisu
-$(MODULE_NAME)-objs := minisu.o
 obj-m := $(MODULE_NAME).o
 
 ccflags-y += -Wno-declaration-after-statement
