@@ -8,6 +8,11 @@ ccflags-y += -Wno-unused-result
 ccflags-y += -Wno-unused-function
 ccflags-y += -Wno-builtin-macro-redefined -U__FILE__ -D__FILE__='""'
 
+ifeq ($(KERNEL_SRC),)
+# KERNEL_SRC := android13-5.15-167/out/android13-5.15/common
+KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
+endif
+
 KDIR := $(KERNEL_SRC)
 MDIR := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
