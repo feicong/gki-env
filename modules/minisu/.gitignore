@@ -1,0 +1,7 @@
+.DS_Store
+test
+*.o
+*.cmd
+*.ko
+Module.symvers
+modules.order

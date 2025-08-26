@@ -19,8 +19,18 @@ all: modules test
 modules:
 	$(MAKE) -C $(KDIR) M=$(MDIR) modules
 
+insmod:
+	@sudo dmesg -c
+	@sudo insmod minisu.ko
+
+rmmod:
+	@sudo rmmod minisu.ko
+	@sudo dmesg -c
+
 test: test.c
 	gcc -o test test.c
+	timeout 10s ./test
+	rm test
 
 compdb:
 	python3 $(MDIR)/.vscode/generate_compdb.py -O $(KDIR) $(MDIR)
