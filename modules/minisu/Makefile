@@ -32,7 +32,7 @@ rmmod:
 	@sudo rmmod minisu.ko
 	@sudo dmesg -c
 
-test: test.c
+test:
 	gcc -o test test.c
 	timeout 10s ./test
 	rm test
