@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2025 fei_cong (https://github.com/feicong/ebpf-course)
+// Copyright (c) 2023-2026 fei_cong (https://github.com/feicong/feicong-course)
 #include <fcntl.h>
 #include <unistd.h>
 
