@@ -8,7 +8,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("feicong <fei_cong@hotmail.com>");
-MODULE_DESCRIPTION("Create /dev/fake_cpuinfo with custom content using chrdev");
+MODULE_DESCRIPTION("Create /dev/cdevcpuinfo with custom content using chrdev");
 MODULE_VERSION("0.3");
 
 #define DEVICE_NAME "cdevcpuinfo"
