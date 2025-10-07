@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2024-2026 fei_cong(https://github.com/feicong/frida-course)
+# Copyright (c) 2024-2026 fei_cong(https://github.com/feicong/feicong-course)
 # export https_proxy=http://192.168.0.120:7890 http_proxy=http://192.168.0.120:7890 all_proxy=socks5://192.168.0.120:7890
 
 set -euo pipefail
