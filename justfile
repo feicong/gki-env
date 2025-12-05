@@ -64,7 +64,7 @@ download-deps:
     echo "正在下载依赖..."
     # 克隆 AnyKernel3
     if [ ! -d "AnyKernel3" ]; then
-        git clone https://github.com/KernelSU-Next/AnyKernel3.git -b gki --depth 1
+        git clone https://github.com/KernelSU-Next/AnyKernel3.git -b master --depth 1
     fi
     # 克隆 SUSFS
     if [ ! -d "susfs4ksu" ]; then
