@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_VERSION: "android13"
+      KERNEL_VERSION: "5.15"
+      SUB_LEVEL: "167"
+      OS_PATCH_LEVEL: "2024-11"
+      KERNELSU_VARIANT: "KSU"
+      KERNELSU_BRANCH: "Stable"
+      INCLUDE_SUSFS: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - cook-cvd
+          - cook-cvd-ksu
+          - cook-gki
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.target }}-${{ hashFiles('justfile') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.target }}-
+            ${{ runner.os }}-ccache-
+
+      - name: Cache bazel
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/bazel
+          key: ${{ runner.os }}-bazel-${{ matrix.target }}-${{ hashFiles('justfile') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-${{ matrix.target }}-
+            ${{ runner.os }}-bazel-
+
+      - name: Build
+        env:
+          REPO_NO_INTERACTIVE: "1"
+        run: |
+          just ${{ matrix.target }}
