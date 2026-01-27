@@ -106,6 +106,51 @@ apply-kernelsu:
     echo "正在应用 KernelSU 补丁..."
     cd {{CONFIG}}/common
 
+    apply_ksu_compat_fix() {
+        local ksud_path=""
+        # 查找所有可能的 ksud.h 路径
+        local candidates=(
+            "./drivers/kernelsu/ksud.h"
+            "./KernelSU/kernel/ksud.h"
+        )
+        for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+                ksud_path="$candidate"
+                break
+            fi
+        done
+        if [ -z "$ksud_path" ]; then
+            echo "[compat_fix] 未找到 ksud.h，跳过修复"
+            return 0
+        fi
+
+        echo "[compat_fix] 找到 ksud.h: $ksud_path"
+
+        if ! grep -q "compat_uptr_t" "$ksud_path"; then
+            echo "[compat_fix] ksud.h 中未使用 compat_uptr_t，跳过"
+            return 0
+        fi
+        if grep -q "linux/compat.h" "$ksud_path"; then
+            echo "[compat_fix] linux/compat.h 已包含，跳过"
+            return 0
+        fi
+
+        echo "[compat_fix] 添加 #include <linux/compat.h> 到 $ksud_path"
+        if grep -q "linux/types.h" "$ksud_path"; then
+            sed -i '/linux\/types.h/a #include <linux/compat.h>' "$ksud_path"
+        else
+            sed -i '1i #include <linux/compat.h>' "$ksud_path"
+        fi
+
+        # 验证修复是否成功
+        if grep -q "linux/compat.h" "$ksud_path"; then
+            echo "[compat_fix] 修复成功"
+        else
+            echo "[compat_fix] 修复失败!" >&2
+            return 1
+        fi
+    }
+
     # 判断分支
     BRANCH_ARG=""
     if [[ "{{KERNELSU_BRANCH}}" == "Stable" ]]; then
@@ -124,7 +169,8 @@ apply-kernelsu:
     case "{{KERNELSU_VARIANT}}" in
         "KSU")
             if [ -d "./drivers/kernelsu" ]; then
-                echo "KernelSU 补丁已应用，跳过。"
+                echo "KernelSU 补丁已应用，检查兼容性修复..."
+                apply_ksu_compat_fix
                 exit 0
             fi
             echo "正在添加 KernelSU 补丁..."
@@ -133,23 +179,30 @@ apply-kernelsu:
                 rm -rf ./drivers/kernelsu
                 cp -r -f KernelSU/kernel ./drivers/kernelsu
                 sed -i 's/^.*ccflags-y += -DKSU_VERSION=.*$/ccflags-y += -DKSU_VERSION=12345/' ./drivers/kernelsu/Makefile
+                apply_ksu_compat_fix
                 echo "KernelSU 本地添加补丁成功。"
                 exit 0
             fi
             echo "添加 KernelSU 官方版本..."
-            curl -LSs "https://ghfast.top/https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            SETUP_URL="https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh"
+            SETUP_SCRIPT=$(curl -LSs "$SETUP_URL" || curl -LSs "https://ghfast.top/$SETUP_URL")
+            echo "$SETUP_SCRIPT" | bash -s -- $BRANCH_ARG
+            apply_ksu_compat_fix
             ;;
         "KSU_NEXT")
             echo "添加 KernelSU Next 版本..."
             curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            apply_ksu_compat_fix
             ;;
         "MKSU")
             echo "添加 KernelSU MKSU 版本..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            apply_ksu_compat_fix
             ;;
         "WILD")
             echo "添加 Wild KSU 版本..."
             curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s -- $BRANCH_ARG
+            apply_ksu_compat_fix
             ;;
     esac
 
