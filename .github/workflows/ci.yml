@@ -17,13 +17,17 @@ jobs:
       KERNELSU_VARIANT: "KSU"
       KERNELSU_BRANCH: "Stable"
       INCLUDE_SUSFS: "true"
+      BAZEL_LTO: ${{ matrix.lto }}
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - cook-cvd
-          - cook-cvd-ksu
-          - cook-gki
+        include:
+          - target: cook-cvd
+            lto: none
+          - target: cook-cvd-ksu
+            lto: none
+          - target: cook-gki
+            lto: thin
     steps:
       - uses: actions/checkout@v6
 
@@ -31,6 +35,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y just
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /usr/share/swift
+          sudo docker image prune -a -f
+          sudo apt-get clean
+          df -h
 
       - name: Cache ccache
         uses: actions/cache@v5

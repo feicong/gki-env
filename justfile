@@ -9,6 +9,7 @@ export OS_PATCH_LEVEL := env_var_or_default("OS_PATCH_LEVEL", "2024-11")
 export KERNELSU_VARIANT := env_var_or_default("KERNELSU_VARIANT", "KSU")
 export KERNELSU_BRANCH := env_var_or_default("KERNELSU_BRANCH", "Stable")
 export INCLUDE_SUSFS := env_var_or_default("INCLUDE_SUSFS", "true")
+export BAZEL_LTO := env_var_or_default("BAZEL_LTO", "thin")
 
 # 目录设置
 WORKSPACE := justfile_directory()
@@ -358,7 +359,7 @@ build-gki:
     set -e
     set -x
     
-    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto={{BAZEL_LTO}} //common:kernel_aarch64_dist
     
     ccache --show-stats
 
@@ -371,7 +372,7 @@ build-cvd-kernel-aarch64:
     set -e
     set -x
     
-    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_aarch64_dist
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto={{BAZEL_LTO}} //common-modules/virtual-device:virtual_device_aarch64_dist
     
     ccache --show-stats
 
@@ -384,7 +385,7 @@ build-cvd-kernel-x86_64:
     set -e
     set -x
     
-    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto=thin //common-modules/virtual-device:virtual_device_x86_64_dist
+    tools/bazel build --disk_cache=$HOME/.cache/bazel --config=fast --lto={{BAZEL_LTO}} //common-modules/virtual-device:virtual_device_x86_64_dist
     
     ccache --show-stats
     echo "编译完成！"
