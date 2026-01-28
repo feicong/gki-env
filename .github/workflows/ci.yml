@@ -15,7 +15,7 @@ jobs:
       SUB_LEVEL: "167"
       OS_PATCH_LEVEL: "2024-11"
       KERNELSU_VARIANT: "KSU"
-      KERNELSU_BRANCH: "Stable"
+      KERNELSU_BRANCH: "Dev"
       INCLUDE_SUSFS: "true"
       BAZEL_LTO: ${{ matrix.lto }}
     strategy:
@@ -26,7 +26,13 @@ jobs:
             lto: none
           - target: cook-cvd-ksu
             lto: none
+          - target: cook-cvd-aarch64
+            lto: none
+          - target: cook-cvd-ksu-aarch64
+            lto: none
           - target: cook-gki
+            lto: thin
+          - target: cook-gki-ksu
             lto: thin
     steps:
       - uses: actions/checkout@v6
@@ -65,3 +71,15 @@ jobs:
           REPO_NO_INTERACTIVE: "1"
         run: |
           just ${{ matrix.target }}
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-artifacts
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            dist/**
+            ${{ env.ANDROID_VERSION }}-${{ env.KERNEL_VERSION }}-${{ env.SUB_LEVEL }}/bazel-bin/common/kernel_aarch64/**
+            ${{ env.ANDROID_VERSION }}-${{ env.KERNEL_VERSION }}-${{ env.SUB_LEVEL }}/bazel-bin/common-modules/virtual-device/**

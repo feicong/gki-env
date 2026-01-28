@@ -106,58 +106,14 @@ apply-kernelsu:
     echo "正在应用 KernelSU 补丁..."
     cd {{CONFIG}}/common
 
-    apply_ksu_compat_fix() {
-        local ksud_path=""
-        # 查找所有可能的 ksud.h 路径
-        local candidates=(
-            "./drivers/kernelsu/ksud.h"
-            "./KernelSU/kernel/ksud.h"
-        )
-        for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-                ksud_path="$candidate"
-                break
-            fi
-        done
-        if [ -z "$ksud_path" ]; then
-            echo "[compat_fix] 未找到 ksud.h，跳过修复"
-            return 0
-        fi
-
-        echo "[compat_fix] 找到 ksud.h: $ksud_path"
-
-        if ! grep -q "compat_uptr_t" "$ksud_path"; then
-            echo "[compat_fix] ksud.h 中未使用 compat_uptr_t，跳过"
-            return 0
-        fi
-        if grep -q "linux/compat.h" "$ksud_path"; then
-            echo "[compat_fix] linux/compat.h 已包含，跳过"
-            return 0
-        fi
-
-        echo "[compat_fix] 添加 #include <linux/compat.h> 到 $ksud_path"
-        if grep -q "linux/types.h" "$ksud_path"; then
-            sed -i '/linux\/types.h/a #include <linux/compat.h>' "$ksud_path"
-        else
-            sed -i '1i #include <linux/compat.h>' "$ksud_path"
-        fi
-
-        # 验证修复是否成功
-        if grep -q "linux/compat.h" "$ksud_path"; then
-            echo "[compat_fix] 修复成功"
-        else
-            echo "[compat_fix] 修复失败!" >&2
-            return 1
-        fi
-    }
-
     # 判断分支
     BRANCH_ARG=""
     if [[ "{{KERNELSU_BRANCH}}" == "Stable" ]]; then
         BRANCH_ARG=""
     elif [[ "{{KERNELSU_BRANCH}}" == "Dev" ]]; then
         if [[ "{{KERNELSU_VARIANT}}" == "KSU" || "{{KERNELSU_VARIANT}}" == "MKSU" ]]; then
-            BRANCH_ARG="-s main"
+            # Official/MKSU setup.sh expects a commit/tag, not -s args.
+            BRANCH_ARG="main"
         elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
             BRANCH_ARG="-s next"
         elif [[ "{{KERNELSU_VARIANT}}" == "WILD" ]]; then
@@ -169,8 +125,7 @@ apply-kernelsu:
     case "{{KERNELSU_VARIANT}}" in
         "KSU")
             if [ -d "./drivers/kernelsu" ]; then
-                echo "KernelSU 补丁已应用，检查兼容性修复..."
-                apply_ksu_compat_fix
+                echo "KernelSU 补丁已应用，跳过。"
                 exit 0
             fi
             echo "正在添加 KernelSU 补丁..."
@@ -179,7 +134,6 @@ apply-kernelsu:
                 rm -rf ./drivers/kernelsu
                 cp -r -f KernelSU/kernel ./drivers/kernelsu
                 sed -i 's/^.*ccflags-y += -DKSU_VERSION=.*$/ccflags-y += -DKSU_VERSION=12345/' ./drivers/kernelsu/Makefile
-                apply_ksu_compat_fix
                 echo "KernelSU 本地添加补丁成功。"
                 exit 0
             fi
@@ -187,22 +141,18 @@ apply-kernelsu:
             SETUP_URL="https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh"
             SETUP_SCRIPT=$(curl -LSs "$SETUP_URL" || curl -LSs "https://ghfast.top/$SETUP_URL")
             echo "$SETUP_SCRIPT" | bash -s -- $BRANCH_ARG
-            apply_ksu_compat_fix
             ;;
         "KSU_NEXT")
             echo "添加 KernelSU Next 版本..."
             curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s -- $BRANCH_ARG
-            apply_ksu_compat_fix
             ;;
         "MKSU")
             echo "添加 KernelSU MKSU 版本..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s -- $BRANCH_ARG
-            apply_ksu_compat_fix
             ;;
         "WILD")
             echo "添加 Wild KSU 版本..."
             curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s -- $BRANCH_ARG
-            apply_ksu_compat_fix
             ;;
     esac
 
@@ -232,6 +182,13 @@ apply-susfs:
         else
             patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch
         fi
+        # 同步 SUSFS 补丁到 drivers/kernelsu (如果存在)
+        cd {{WORKSPACE}}/{{CONFIG}}/common
+        if [ -d "./drivers/kernelsu" ] && [ -d "./KernelSU/kernel" ]; then
+            echo "同步 SUSFS 补丁从 KernelSU/kernel 到 drivers/kernelsu..."
+            cp -f ./KernelSU/kernel/*.h ./drivers/kernelsu/ 2>/dev/null || true
+            cp -f ./KernelSU/kernel/*.c ./drivers/kernelsu/ 2>/dev/null || true
+        fi
     elif [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "为 KernelSU-Next 应用 SUSFS 补丁..."
         cd ./common/KernelSU-Next
@@ -250,33 +207,57 @@ apply-susfs:
         else
             patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
         fi
+        # 同步 SUSFS 补丁到 drivers/kernelsu (如果存在)
+        cd {{WORKSPACE}}/{{CONFIG}}/common
+        if [ -d "./drivers/kernelsu" ] && [ -d "./KernelSU/kernel" ]; then
+            echo "同步 SUSFS 补丁从 KernelSU/kernel 到 drivers/kernelsu..."
+            cp -f ./KernelSU/kernel/*.h ./drivers/kernelsu/ 2>/dev/null || true
+            cp -f ./KernelSU/kernel/*.c ./drivers/kernelsu/ 2>/dev/null || true
+        fi
     fi
-    cd ../
+    cd {{WORKSPACE}}/{{CONFIG}}/common
     if patch -p1 --dry-run -N < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch | grep -q 'Reversed (or previously applied) patch detected'; then
     echo "50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch 已应用，跳过。"
     else
         patch -p1 --fuzz=3 < 50_add_susfs_in_gki-{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.patch || true
     fi
+
+    # 修复 compat_uptr_t 未定义问题 - SUSFS 补丁使用了 compat_uptr_t 但未 include linux/compat.h
+    # 使用补丁文件修复，比 sed hack 更优雅
+    echo "应用 ksud.h compat 修复补丁..."
+    for ksu_dir in "./drivers/kernelsu" "./KernelSU/kernel"; do
+        if [ -d "$ksu_dir" ]; then
+            cd {{WORKSPACE}}/{{CONFIG}}/common
+            cp {{WORKSPACE}}/patches/fix_ksud_compat.patch "$ksu_dir/"
+            cd "$ksu_dir"
+            if patch -p1 --dry-run -N < fix_ksud_compat.patch 2>/dev/null | grep -q 'Reversed (or previously applied) patch detected'; then
+                echo "fix_ksud_compat.patch 已应用于 $ksu_dir，跳过。"
+            else
+                patch -p1 --fuzz=3 < fix_ksud_compat.patch || echo "fix_ksud_compat.patch 应用于 $ksu_dir 失败或不适用"
+            fi
+        fi
+    done
+
     echo "SUSFS 补丁应用完成。"
 
 # 应用其他补丁
 apply-patches:
     #!/bin/bash
     echo "正在应用其他补丁..."
-    cd {{CONFIG}}
-    
+    cd {{WORKSPACE}}/{{CONFIG}}
+
     # KSU 变体应用 Managers 补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU" ]]; then
         cd common/KernelSU
         if [[ "{{INCLUDE_SUSFS}}" == "true" ]]; then
-            cp ../../../kernel_patches/apk_sign.c_fix.patch ./
+            cp {{WORKSPACE}}/patches/apk_sign.c_fix.patch ./
             if patch -p1 --dry-run -N < apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
                 echo "apk_sign.c_fix.patch 已应用，跳过。"
             else
                 patch -p1 --fuzz=3 < apk_sign.c_fix.patch
             fi
         else
-            cp ../../../kernel_patches/no-susfs_apk_sign.c_fix.patch ./
+            cp {{WORKSPACE}}/patches/no-susfs_apk_sign.c_fix.patch ./
             if patch -p1 --dry-run -N < no-susfs_apk_sign.c_fix.patch | grep -q 'Reversed (or previously applied) patch detected'; then
                 echo "no-susfs_apk_sign.c_fix.patch 已应用，跳过。"
             else
@@ -289,7 +270,7 @@ apply-patches:
     # 应用 hooks 补丁（已应用则跳过）
     if [[ "{{KERNELSU_VARIANT}}" == "KSU_NEXT" ]]; then
         echo "为 KernelSU-Next 应用 hooks 补丁..."
-        cp ../../../kernel_patches/next/syscall_hooks.patch ./
+        cp {{WORKSPACE}}/kernel_patches/next/syscall_hooks.patch ./
         if patch -p1 --dry-run -N < syscall_hooks.patch | grep -q 'Reversed (or previously applied) patch detected'; then
             echo "syscall_hooks.patch 已应用，跳过。"
         else
@@ -298,7 +279,8 @@ apply-patches:
     fi
 
     # 应用隐藏补丁（已应用则跳过）
-    cp ../../kernel_patches/69_hide_stuff.patch ./
+    cd {{WORKSPACE}}/{{CONFIG}}/common
+    cp {{WORKSPACE}}/patches/69_hide_stuff.patch ./
     if patch -p1 --dry-run -N < 69_hide_stuff.patch | grep -q 'Reversed (or previously applied) patch detected'; then
         echo "69_hide_stuff.patch 已应用，跳过。"
     else
@@ -311,9 +293,13 @@ configure:
     #!/bin/bash
     echo "正在配置内核..."
     cd {{CONFIG}}
-    
+
     GKI_DEFCONFIG_ARM64="./common/arch/arm64/configs/gki_defconfig"
     GKI_DEFCONFIG_X86="./common/arch/x86/configs/gki_defconfig"
+
+    # 确保 SUSFS 的依赖 THREAD_INFO_IN_TASK 被启用 (x86_64 可能需要)
+    echo "CONFIG_THREAD_INFO_IN_TASK=y" >> ${GKI_DEFCONFIG_ARM64}
+    echo "CONFIG_THREAD_INFO_IN_TASK=y" >> ${GKI_DEFCONFIG_X86}
 
     # 为 arm64 和 x86 添加 KSU 配置
     echo "CONFIG_KSU=y" >> ${GKI_DEFCONFIG_ARM64}
@@ -401,6 +387,29 @@ configure:
     sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
     rm -rf ./common/android/abi_gki_protected_exports_*
     sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+
+    # 验证配置
+    echo "=== 验证 defconfig 配置 ==="
+    echo "ARM64 defconfig KSU/SUSFS 配置:"
+    grep -E "CONFIG_KSU|CONFIG_THREAD_INFO" ${GKI_DEFCONFIG_ARM64} | tail -20 || true
+    echo ""
+    echo "X86 defconfig KSU/SUSFS 配置:"
+    grep -E "CONFIG_KSU|CONFIG_THREAD_INFO" ${GKI_DEFCONFIG_X86} | tail -20 || true
+    echo ""
+
+    # 验证 KernelSU Kconfig 中 SUSFS 选项是否存在
+    KSU_KCONFIG="./common/drivers/kernelsu/Kconfig"
+    if [ -f "$KSU_KCONFIG" ]; then
+        echo "KernelSU Kconfig SUSFS 选项:"
+        grep -A2 "KSU_SUSFS" "$KSU_KCONFIG" | head -10 || echo "未找到 KSU_SUSFS 选项!"
+    else
+        KSU_KCONFIG="./common/KernelSU/kernel/Kconfig"
+        if [ -f "$KSU_KCONFIG" ]; then
+            echo "KernelSU Kconfig SUSFS 选项:"
+            grep -A2 "KSU_SUSFS" "$KSU_KCONFIG" | head -10 || echo "未找到 KSU_SUSFS 选项!"
+        fi
+    fi
+    echo ""
     echo "内核配置已完成。"
 
 # 构建gki内核
@@ -528,6 +537,12 @@ cook-cvd-aarch64: setup download-gki build-cvd-kernel-aarch64
     @echo "构建 aarch64 模拟器内核完成！"
     @echo ""
 
+# 构建aarch64 KernelSU CVD内核
+cook-cvd-ksu-aarch64: setup download-gki apply-kernelsu apply-susfs apply-patches configure build-cvd-kernel-aarch64
+    @echo ""
+    @echo "构建 aarch64 KernelSU 模拟器内核完成！"
+    @echo ""
+
 # 构建gki内核并打包
 cook-gki: setup download-gki build-gki create-bootimg create-anykernel
     @echo ""
@@ -537,6 +552,16 @@ cook-gki: setup download-gki build-gki create-bootimg create-anykernel
     @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
     @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img.gz"
     @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
+    @echo ""
+
+# 构建gki KernelSU内核并打包
+cook-gki-ksu: setup download-gki apply-kernelsu apply-susfs apply-patches configure build-gki create-bootimg create-anykernel
+    @echo ""
+    @echo "构建 KernelSU GKI 内核完成！"
+    @echo ""
+    @echo "生成文件："
+    @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-AnyKernel3.zip"
+    @echo "  - {{DIST_DIR}}/{{KERNELSU_VARIANT}}_{{ANDROID_VERSION}}-{{KERNEL_VERSION}}.{{SUB_LEVEL}}-{{OS_PATCH_LEVEL}}-boot*.img"
     @echo ""
 
 # 配置 WORKSPACE 文件
