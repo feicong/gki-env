@@ -514,10 +514,11 @@ clean-all: clean
 # 重置repo代码
 reset:
     #!/bin/bash
-    @echo "重置 repo 代码..."
+    set -e
+    echo "重置 repo 代码..."
     cd {{CONFIG}}
-    repo forall -c "git reset --hard"
-    repo forall -c "git clean -fd"
+    {{WORKSPACE}}/git-repo/repo forall -c "git reset --hard"
+    {{WORKSPACE}}/git-repo/repo forall -c "git clean -fd"
 
 # 构建x86_64 CVD内核
 cook-cvd: setup download-gki build-cvd-kernel-x86_64
@@ -739,9 +740,9 @@ fake-meminfo:
     #!/bin/bash
     set -e
     sudo unshare -m bash -c '
+        trap "umount /proc/meminfo" EXIT
         mount --bind /etc/apt/sources.list.d/ubuntu.sources /proc/meminfo
-        exec cat /proc/meminfo
-        umount /proc/meminfo
+        cat /proc/meminfo
     '
     echo "/proc/meminfo 模拟完成。"
 
